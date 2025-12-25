@@ -34,7 +34,7 @@ export class LocationsGateway
 
   @SubscribeMessage('update_location')
   async handleLocationUpdate(
-    @MessageBody() data: { userId: string; lat: number; lng: number },
+    @MessageBody() data: { userId: string; lat: number; lng: number; filters?: { breed?: string } },
     @ConnectedSocket() client: Socket,
   ) {
     if (!data.userId) return;
@@ -48,6 +48,7 @@ export class LocationsGateway
       data.lat,
       data.lng,
       radius,
+      data.filters,
     );
 
     console.log('Nearby users:', nearby);
@@ -61,7 +62,7 @@ export class LocationsGateway
 
   @SubscribeMessage('update_search_radius')
   async handleRadiusUpdate(
-    @MessageBody() data: { userId: string; radius: number },
+    @MessageBody() data: { userId: string; radius: number; filters?: { breed?: string } },
   ) {
     if (!data.userId) return;
 
@@ -76,6 +77,7 @@ export class LocationsGateway
       userLocation.lat,
       userLocation.lng,
       data.radius,
+      data.filters,
     );
 
     console.log('Nearby users after radius update:', nearby);

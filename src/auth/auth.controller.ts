@@ -17,7 +17,7 @@ import {
   ApiBearerAuth,
   ApiProperty,
 } from '@nestjs/swagger';
-import { IsEmail, IsString, MinLength, IsEnum } from 'class-validator';
+import { IsEmail, IsString, MinLength, IsEnum, IsOptional, IsNumber } from 'class-validator';
 import { AuthService } from './auth.service';
 import { SupabaseAuthGuard } from './auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -56,6 +56,23 @@ class UpdateRoleDto {
   @ApiProperty({ example: 'admin', enum: UserRole, description: 'User role' })
   @IsEnum(UserRole)
   role: UserRole;
+}
+
+class UpdateProfileDto {
+  @ApiProperty({ example: 'Buddy', description: 'Dog name', required: false })
+  @IsString()
+  @IsOptional()
+  dogName?: string;
+
+  @ApiProperty({ example: 'Golden Retriever', description: 'Dog breed', required: false })
+  @IsString()
+  @IsOptional()
+  dogBreed?: string;
+
+  @ApiProperty({ example: 3, description: 'Dog age', required: false })
+  @IsNumber()
+  @IsOptional()
+  dogAge?: number;
 }
 
 @ApiTags('auth')
@@ -405,6 +422,51 @@ export class AuthController {
         {
           statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
           message: 'An unexpected error occurred while updating role.',
+          error: error.message,
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Patch('profile')
+  @ApiOperation({ summary: 'Update user profile' })
+  @ApiResponse({ status: 200, description: 'Profile updated' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiBearerAuth()
+  @UseGuards(SupabaseAuthGuard)
+  async updateProfile(@Headers('authorization') authHeader: string, @Body() updateProfileDto: UpdateProfileDto) {
+    try {
+      const token = authHeader.replace('Bearer ', '');
+      const userResult = await this.authService.getUser(token);
+      if (!userResult.success || !userResult.data?.user) {
+        throw new HttpException('Invalid token', HttpStatus.UNAUTHORIZED);
+      }
+      const result = await this.authService.updateUserProfile(userResult.data.user.id, updateProfileDto);
+
+      if (result.success) {
+        return {
+          statusCode: HttpStatus.OK,
+          message: result.message,
+        };
+      } else {
+        throw new HttpException(
+          {
+            statusCode: HttpStatus.BAD_REQUEST,
+            message: result.message,
+            error: result.error,
+          },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        {
+          statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+          message: 'An unexpected error occurred while updating profile.',
           error: error.message,
         },
         HttpStatus.INTERNAL_SERVER_ERROR,

@@ -180,6 +180,22 @@ export class AuthService {
     }
   }
 
+  async updateUserProfile(userId: string, profileData: Partial<User>) {
+    try {
+      await this.userRepo.update(userId, profileData);
+      return {
+        success: true,
+        message: 'Profile updated.',
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: 'Error updating profile.',
+        error: error.message,
+      };
+    }
+  }
+
   async resetPassword(email: string) {
     try {
       const { error } = await this.supabase.auth.resetPasswordForEmail(email, {

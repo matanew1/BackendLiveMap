@@ -21,6 +21,16 @@ export class User {
   })
   role: UserRole;
 
+  // Dog-related fields
+  @Column({ nullable: true })
+  dogName: string;
+
+  @Column({ nullable: true })
+  dogBreed: string;
+
+  @Column({ nullable: true })
+  dogAge: number;
+
   @CreateDateColumn()
   created_at: Date;
 }
