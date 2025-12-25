@@ -20,17 +20,28 @@ export class LocationsService {
     await this.repo.query(`
       CREATE INDEX IF NOT EXISTS location_gist_idx ON users_locations USING GIST (location);
     `);
+    // Add dog columns to users table if not exists
+    await this.repo.query(
+      `ALTER TABLE users ADD COLUMN IF NOT EXISTS "dogName" VARCHAR;`,
+    );
+    await this.repo.query(
+      `ALTER TABLE users ADD COLUMN IF NOT EXISTS "dogBreed" VARCHAR;`,
+    );
+    await this.repo.query(
+      `ALTER TABLE users ADD COLUMN IF NOT EXISTS "dogAge" INTEGER;`,
+    );
   }
 
   async saveLocation(userId: string, lat: number, lng: number) {
-    const location = `POINT(${lng} ${lat})`;
-    return this.repo.upsert(
-      {
-        user_id: userId,
-        location,
-        last_updated: new Date(),
-      },
-      ['user_id'],
+    return this.repo.query(
+      `
+      INSERT INTO users_locations (user_id, location)
+      VALUES ($1, ST_MakePoint($2, $3)::geography)
+      ON CONFLICT (user_id)
+      DO UPDATE SET location = ST_MakePoint($2, $3)::geography, last_updated = now()
+      RETURNING *;
+      `,
+      [userId, lng, lat],
     );
   }
 
@@ -51,7 +62,7 @@ export class LocationsService {
              ST_Y(ul.location::geometry) AS lat,
              ST_X(ul.location::geometry) AS lng,
              ST_Distance(ul.location, ST_MakePoint($2, $1)::geography) AS distance,
-             u.dog_breed, u.dog_name
+             u."dogBreed", u."dogName"
       FROM users_locations ul
       LEFT JOIN users u ON ul.user_id = u.id
       WHERE ST_DWithin(ul.location, ST_MakePoint($2, $1)::geography, $3)
@@ -61,7 +72,7 @@ export class LocationsService {
     let paramIndex = 4;
 
     if (filters.breed) {
-      query += ` AND u.dog_breed = $${paramIndex}`;
+      query += ` AND u."dogBreed" = $${paramIndex}`;
       params.push(filters.breed);
       paramIndex++;
     }

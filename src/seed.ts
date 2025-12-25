@@ -9,8 +9,8 @@ async function seed() {
   const service = app.get(LocationsService);
 
   // Get starting point coordinates from command line args or env vars
-  const latArg = process.argv[2] || process.env.SEED_LAT;
-  const lngArg = process.argv[3] || process.env.SEED_LNG;
+  const latArg = process.argv[2] || process.env.SEED_LAT || '32.0811944503777';
+  const lngArg = process.argv[3] || process.env.SEED_LNG || '34.8907372674565';
 
   if (!latArg || !lngArg) {
     console.error(
@@ -89,11 +89,7 @@ async function seed() {
         );
       }
 
-      const result = await service.saveLocation(
-        user.userId,
-        coords.lat,
-        coords.lng,
-      );
+      await service.saveLocation(user.userId, coords.lat, coords.lng);
       console.log(
         `Inserted ${user.userId}: ${user.distance}m away at bearing ${user.bearing}° -`,
         {

@@ -17,7 +17,14 @@ import {
   ApiBearerAuth,
   ApiProperty,
 } from '@nestjs/swagger';
-import { IsEmail, IsString, MinLength, IsEnum, IsOptional, IsNumber } from 'class-validator';
+import {
+  IsEmail,
+  IsString,
+  MinLength,
+  IsEnum,
+  IsOptional,
+  IsNumber,
+} from 'class-validator';
 import { AuthService } from './auth.service';
 import { SupabaseAuthGuard } from './auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -64,7 +71,11 @@ class UpdateProfileDto {
   @IsOptional()
   dogName?: string;
 
-  @ApiProperty({ example: 'Golden Retriever', description: 'Dog breed', required: false })
+  @ApiProperty({
+    example: 'Golden Retriever',
+    description: 'Dog breed',
+    required: false,
+  })
   @IsString()
   @IsOptional()
   dogBreed?: string;
@@ -435,14 +446,20 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiBearerAuth()
   @UseGuards(SupabaseAuthGuard)
-  async updateProfile(@Headers('authorization') authHeader: string, @Body() updateProfileDto: UpdateProfileDto) {
+  async updateProfile(
+    @Headers('authorization') authHeader: string,
+    @Body() updateProfileDto: UpdateProfileDto,
+  ) {
     try {
       const token = authHeader.replace('Bearer ', '');
       const userResult = await this.authService.getUser(token);
       if (!userResult.success || !userResult.data?.user) {
         throw new HttpException('Invalid token', HttpStatus.UNAUTHORIZED);
       }
-      const result = await this.authService.updateUserProfile(userResult.data.user.id, updateProfileDto);
+      const result = await this.authService.updateUserProfile(
+        userResult.data.user.id,
+        updateProfileDto,
+      );
 
       if (result.success) {
         return {
