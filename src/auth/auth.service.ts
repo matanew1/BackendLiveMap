@@ -147,10 +147,11 @@ export class AuthService {
 
   async updateUserRole(userId: string, role: UserRole) {
     try {
-      await this.userRepo.update(userId, { role });
+      const updatedUser = await this.userRepo.update(userId, { role });
       return {
         success: true,
         message: 'User role updated.',
+        data: updatedUser,
       };
     } catch (error) {
       return {
@@ -163,10 +164,23 @@ export class AuthService {
 
   async updateUserProfile(userId: string, profileData: Partial<User>) {
     try {
+      const user = await this.userRepo.findOne({ where: { id: userId } });
+      if (!user) {
+        return {
+          success: false,
+          message: 'User not found.',
+        };
+      }
+
       await this.userRepo.update(userId, profileData);
+      const updatedUser = await this.userRepo.findOne({
+        where: { id: userId },
+      });
+
       return {
         success: true,
         message: 'Profile updated.',
+        data: updatedUser,
       };
     } catch (error) {
       return {

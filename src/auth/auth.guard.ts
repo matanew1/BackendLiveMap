@@ -16,7 +16,9 @@ export class SupabaseAuthGuard implements CanActivate {
     const authHeader = request.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      throw new UnauthorizedException('No or invalid authorization header');
+      throw new UnauthorizedException(
+        'Authorization header must be in format: Bearer <token>',
+      );
     }
 
     const token = authHeader.replace('Bearer ', '');
@@ -34,14 +36,18 @@ export class SupabaseAuthGuard implements CanActivate {
           role:
             profile.success && profile.data ? profile.data.role : UserRole.USER,
         };
+        request.authResult = result; // Store the full result
         return true;
       } else {
-        throw new UnauthorizedException(result.message || 'Invalid token');
+        throw new UnauthorizedException(
+          result.error || result.message || 'Invalid token',
+        );
       }
     } catch (error) {
       if (error instanceof UnauthorizedException) {
         throw error;
       }
+      console.error('Auth error:', error);
       throw new UnauthorizedException('Invalid token');
     }
   }

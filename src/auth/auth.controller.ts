@@ -9,6 +9,7 @@ import {
   HttpStatus,
   Param,
   Patch,
+  Req,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -16,7 +17,16 @@ import {
   ApiResponse,
   ApiBearerAuth,
   ApiProperty,
+  ApiExtraModels,
 } from '@nestjs/swagger';
+import type { Request } from 'express';
+
+declare module 'express' {
+  interface Request {
+    user?: any;
+    authResult?: any;
+  }
+}
 import {
   IsEmail,
   IsString,
@@ -29,7 +39,7 @@ import { AuthService } from './auth.service';
 import { SupabaseAuthGuard } from './auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
-import { UserRole } from './user.entity';
+import { User, UserRole } from './user.entity';
 
 class SignUpDto {
   @ApiProperty({ example: 'matanew1@gmail.com', description: 'User email' })
@@ -86,6 +96,7 @@ class UpdateProfileDto {
   dogAge?: number;
 }
 
+@ApiExtraModels(User)
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
@@ -188,7 +199,7 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'User signed out successfully' })
   @ApiResponse({ status: 400, description: 'Bad request - Sign out failed' })
   @ApiResponse({ status: 500, description: 'Internal server error' })
-  @ApiBearerAuth()
+  @ApiBearerAuth('JWT-auth')
   @UseGuards(SupabaseAuthGuard)
   async signOut() {
     try {
@@ -229,29 +240,15 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'User info retrieved' })
   @ApiResponse({ status: 401, description: 'Unauthorized - Invalid token' })
   @ApiResponse({ status: 500, description: 'Internal server error' })
-  @ApiBearerAuth()
+  @ApiBearerAuth('JWT-auth')
   @UseGuards(SupabaseAuthGuard)
-  async getUser(@Headers('authorization') authHeader: string) {
+  async getUser(@Req() request: Request) {
     try {
-      const token = authHeader.replace('Bearer ', '');
-      const result = await this.authService.getUser(token);
-
-      if (result.success) {
-        return {
-          statusCode: HttpStatus.OK,
-          message: result.message,
-          data: result.data,
-        };
-      } else {
-        throw new HttpException(
-          {
-            statusCode: HttpStatus.UNAUTHORIZED,
-            message: result.message,
-            error: result.error,
-          },
-          HttpStatus.UNAUTHORIZED,
-        );
-      }
+      return {
+        statusCode: HttpStatus.OK,
+        message: 'User information retrieved successfully.',
+        data: request.authResult.data,
+      };
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;
@@ -313,18 +310,11 @@ export class AuthController {
   @ApiOperation({ summary: 'Get user profile' })
   @ApiResponse({ status: 200, description: 'Profile retrieved' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiBearerAuth()
+  @ApiBearerAuth('JWT-auth')
   @UseGuards(SupabaseAuthGuard)
-  async getProfile(@Headers('authorization') authHeader: string) {
+  async getProfile(@Req() request: Request) {
     try {
-      const token = authHeader.replace('Bearer ', '');
-      const userResult = await this.authService.getUser(token);
-      if (!userResult.success || !userResult.data?.user) {
-        throw new HttpException('Invalid token', HttpStatus.UNAUTHORIZED);
-      }
-      const profile = await this.authService.getUserProfile(
-        userResult.data.user.id,
-      );
+      const profile = await this.authService.getUserProfile(request.user.id);
 
       if (profile.success) {
         return {
@@ -360,7 +350,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Update user role (admin only)' })
   @ApiResponse({ status: 200, description: 'Role updated' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
-  @ApiBearerAuth()
+  @ApiBearerAuth('JWT-auth')
   @UseGuards(SupabaseAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
   async updateRole(
@@ -377,6 +367,7 @@ export class AuthController {
         return {
           statusCode: HttpStatus.OK,
           message: result.message,
+          data: result.data,
         };
       } else {
         throw new HttpException(
@@ -405,22 +396,28 @@ export class AuthController {
 
   @Patch('profile')
   @ApiOperation({ summary: 'Update user profile' })
-  @ApiResponse({ status: 200, description: 'Profile updated' })
+  @ApiResponse({
+    status: 200,
+    description: 'Profile updated',
+    schema: {
+      type: 'object',
+      properties: {
+        statusCode: { type: 'number' },
+        message: { type: 'string' },
+        data: { $ref: '#/components/schemas/User' },
+      },
+    },
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiBearerAuth()
+  @ApiBearerAuth('JWT-auth')
   @UseGuards(SupabaseAuthGuard)
   async updateProfile(
-    @Headers('authorization') authHeader: string,
+    @Req() request: Request,
     @Body() updateProfileDto: UpdateProfileDto,
   ) {
     try {
-      const token = authHeader.replace('Bearer ', '');
-      const userResult = await this.authService.getUser(token);
-      if (!userResult.success || !userResult.data?.user) {
-        throw new HttpException('Invalid token', HttpStatus.UNAUTHORIZED);
-      }
       const result = await this.authService.updateUserProfile(
-        userResult.data.user.id,
+        request.user.id,
         updateProfileDto,
       );
 
@@ -428,6 +425,7 @@ export class AuthController {
         return {
           statusCode: HttpStatus.OK,
           message: result.message,
+          data: result.data,
         };
       } else {
         throw new HttpException(
