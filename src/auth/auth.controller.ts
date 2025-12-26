@@ -16,7 +16,6 @@ import {
   ApiOperation,
   ApiResponse,
   ApiBearerAuth,
-  ApiProperty,
   ApiExtraModels,
 } from '@nestjs/swagger';
 import type { Request } from 'express';
@@ -27,74 +26,18 @@ declare module 'express' {
     authResult?: any;
   }
 }
-import {
-  IsEmail,
-  IsString,
-  MinLength,
-  IsEnum,
-  IsOptional,
-  IsNumber,
-} from 'class-validator';
 import { AuthService } from './auth.service';
 import { SupabaseAuthGuard } from './auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { User, UserRole } from './user.entity';
-
-class SignUpDto {
-  @ApiProperty({ example: 'matanew1@gmail.com', description: 'User email' })
-  @IsEmail()
-  email: string;
-
-  @ApiProperty({ example: 'strongpassword123', description: 'User password' })
-  @IsString()
-  @MinLength(8)
-  password: string;
-}
-
-class SignInDto {
-  @ApiProperty({ example: 'matanew1@gmail.com', description: 'User email' })
-  @IsEmail()
-  email: string;
-
-  @ApiProperty({ example: 'strongpassword123', description: 'User password' })
-  @IsString()
-  @MinLength(8)
-  password: string;
-}
-
-class RefreshTokenDto {
-  @ApiProperty({ example: 'refresh_token_here', description: 'Refresh token' })
-  @IsString()
-  refreshToken: string;
-}
-
-class UpdateRoleDto {
-  @ApiProperty({ example: 'admin', enum: UserRole, description: 'User role' })
-  @IsEnum(UserRole)
-  role: UserRole;
-}
-
-class UpdateProfileDto {
-  @ApiProperty({ example: 'Buddy', description: 'Dog name', required: false })
-  @IsString()
-  @IsOptional()
-  dogName?: string;
-
-  @ApiProperty({
-    example: 'Golden Retriever',
-    description: 'Dog breed',
-    required: false,
-  })
-  @IsString()
-  @IsOptional()
-  dogBreed?: string;
-
-  @ApiProperty({ example: 3, description: 'Dog age', required: false })
-  @IsNumber()
-  @IsOptional()
-  dogAge?: number;
-}
+import {
+  SignUpDto,
+  SignInDto,
+  RefreshTokenDto,
+  UpdateRoleDto,
+  UpdateProfileDto,
+} from './dto/auth.dto';
 
 @ApiExtraModels(User)
 @ApiTags('auth')
