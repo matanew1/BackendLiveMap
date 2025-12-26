@@ -1,8 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { ConfigService } from '@nestjs/config';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { User, UserRole } from './user.entity';
+import { ApiResponse } from '../common/dto/api-response.dto';
 
 @Injectable()
 export class AuthService {
@@ -11,9 +13,10 @@ export class AuthService {
   constructor(
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
+    private configService: ConfigService,
   ) {
-    const supabaseUrl = process.env.SUPABASE_URL;
-    const supabaseKey = process.env.SUPABASE_ANON_KEY;
+    const supabaseUrl = this.configService.get<string>('supabase.url');
+    const supabaseKey = this.configService.get<string>('supabase.anonKey');
 
     if (!supabaseUrl || !supabaseKey) {
       throw new Error('Supabase URL and anon key must be provided');
@@ -22,7 +25,7 @@ export class AuthService {
     this.supabase = createClient(supabaseUrl, supabaseKey);
   }
 
-  async signUp(email: string, password: string) {
+  async signUp(email: string, password: string): Promise<ApiResponse> {
     try {
       const { data, error } = await this.supabase.auth.signUp({
         email,
@@ -30,12 +33,10 @@ export class AuthService {
       });
 
       if (error) {
-        return {
-          success: false,
-          message:
-            'Failed to create account. Please check your email and password.',
-          error: error.message,
-        };
+        return ApiResponse.error(
+          'Failed to create account. Please check your email and password.',
+          error.message,
+        );
       }
 
       // Create user profile in DB
@@ -46,22 +47,19 @@ export class AuthService {
         });
       }
 
-      return {
-        success: true,
-        message:
-          'Account created successfully. Please check your email for verification.',
+      return ApiResponse.success(
+        'Account created successfully. Please check your email for verification.',
         data,
-      };
+      );
     } catch (error) {
-      return {
-        success: false,
-        message: 'An unexpected error occurred during signup.',
-        error: error.message,
-      };
+      return ApiResponse.error(
+        'An unexpected error occurred during signup.',
+        error.message,
+      );
     }
   }
 
-  async signIn(email: string, password: string) {
+  async signIn(email: string, password: string): Promise<ApiResponse> {
     try {
       const { data, error } = await this.supabase.auth.signInWithPassword({
         email,
@@ -69,24 +67,18 @@ export class AuthService {
       });
 
       if (error) {
-        return {
-          success: false,
-          message: 'Invalid email or password. Please check your credentials.',
-          error: error.message,
-        };
+        return ApiResponse.error(
+          'Invalid email or password. Please check your credentials.',
+          error.message,
+        );
       }
 
-      return {
-        success: true,
-        message: 'Signed in successfully.',
-        data,
-      };
+      return ApiResponse.success('Signed in successfully.', data);
     } catch (error) {
-      return {
-        success: false,
-        message: 'An unexpected error occurred during signin.',
-        error: error.message,
-      };
+      return ApiResponse.error(
+        'An unexpected error occurred during signin.',
+        error.message,
+      );
     }
   }
 
@@ -141,26 +133,15 @@ export class AuthService {
     }
   }
 
-  async getUserProfile(userId: string) {
+  async getUserProfile(userId: string): Promise<ApiResponse<User>> {
     try {
       const user = await this.userRepo.findOne({ where: { id: userId } });
       if (!user) {
-        return {
-          success: false,
-          message: 'User profile not found.',
-        };
+        return ApiResponse.error('User profile not found.');
       }
-      return {
-        success: true,
-        message: 'User profile retrieved.',
-        data: user,
-      };
+      return ApiResponse.success('User profile retrieved.', user);
     } catch (error) {
-      return {
-        success: false,
-        message: 'Error retrieving user profile.',
-        error: error.message,
-      };
+      return ApiResponse.error('Error retrieving user profile.', error.message);
     }
   }
 
@@ -196,52 +177,29 @@ export class AuthService {
     }
   }
 
-  async resetPassword(email: string) {
+  async refreshToken(refreshToken: string) {
     try {
-      const { error } = await this.supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${process.env.FRONTEND_URL}/reset-password`,
+      const { data, error } = await this.supabase.auth.refreshSession({
+        refresh_token: refreshToken,
       });
-      if (error) {
-        return {
-          success: false,
-          message: 'Failed to send reset email.',
-          error: error.message,
-        };
-      }
-      return {
-        success: true,
-        message: 'Password reset email sent.',
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: 'Error sending reset email.',
-        error: error.message,
-      };
-    }
-  }
 
-  async verifyEmail(token: string) {
-    try {
-      const { error } = await this.supabase.auth.verifyOtp({
-        token_hash: token,
-        type: 'email',
-      });
       if (error) {
         return {
           success: false,
-          message: 'Email verification failed.',
+          message: 'Failed to refresh token.',
           error: error.message,
         };
       }
+
       return {
         success: true,
-        message: 'Email verified successfully.',
+        message: 'Token refreshed successfully.',
+        data,
       };
     } catch (error) {
       return {
         success: false,
-        message: 'Error verifying email.',
+        message: 'Error refreshing token.',
         error: error.message,
       };
     }

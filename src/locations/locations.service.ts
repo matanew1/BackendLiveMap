@@ -12,27 +12,10 @@ export class LocationsService {
     private readonly repo: Repository<UsersLocation>,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {
-    this.initDatabase();
+    // Database initialization moved to migrations
   }
 
-  private async initDatabase() {
-    await this.repo.query(`CREATE EXTENSION IF NOT EXISTS postgis;`);
-    await this.repo.query(`
-      CREATE INDEX IF NOT EXISTS location_gist_idx ON users_locations USING GIST (location);
-    `);
-    // Add dog columns to users table if not exists
-    await this.repo.query(
-      `ALTER TABLE users ADD COLUMN IF NOT EXISTS "dogName" VARCHAR;`,
-    );
-    await this.repo.query(
-      `ALTER TABLE users ADD COLUMN IF NOT EXISTS "dogBreed" VARCHAR;`,
-    );
-    await this.repo.query(
-      `ALTER TABLE users ADD COLUMN IF NOT EXISTS "dogAge" INTEGER;`,
-    );
-  }
-
-  async saveLocation(userId: string, lat: number, lng: number) {
+  async saveLocation(userId: string, lat: number, lng: number): Promise<any> {
     return this.repo.query(
       `
       INSERT INTO users_locations (user_id, location)

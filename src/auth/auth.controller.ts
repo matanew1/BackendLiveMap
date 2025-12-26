@@ -53,10 +53,10 @@ class SignInDto {
   password: string;
 }
 
-class ResetPasswordDto {
-  @ApiProperty({ example: 'matanew1@gmail.com', description: 'User email' })
-  @IsEmail()
-  email: string;
+class RefreshTokenDto {
+  @ApiProperty({ example: 'refresh_token_here', description: 'Refresh token' })
+  @IsString()
+  refreshToken: string;
 }
 
 class UpdateRoleDto {
@@ -268,20 +268,21 @@ export class AuthController {
     }
   }
 
-  @Post('reset-password')
-  @ApiOperation({ summary: 'Request password reset' })
-  @ApiResponse({ status: 200, description: 'Reset email sent' })
-  @ApiResponse({ status: 400, description: 'Bad request' })
-  async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
+  @Post('refresh')
+  @ApiOperation({ summary: 'Refresh access token' })
+  @ApiResponse({ status: 200, description: 'Token refreshed successfully' })
+  @ApiResponse({ status: 400, description: 'Refresh failed' })
+  async refreshToken(@Body() refreshTokenDto: RefreshTokenDto) {
     try {
-      const result = await this.authService.resetPassword(
-        resetPasswordDto.email,
+      const result = await this.authService.refreshToken(
+        refreshTokenDto.refreshToken,
       );
 
       if (result.success) {
         return {
           statusCode: HttpStatus.OK,
           message: result.message,
+          data: result.data,
         };
       } else {
         throw new HttpException(
@@ -300,45 +301,7 @@ export class AuthController {
       throw new HttpException(
         {
           statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-          message: 'An unexpected error occurred during password reset.',
-          error: error.message,
-        },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
-  }
-
-  @Post('verify-email')
-  @ApiOperation({ summary: 'Verify email with token' })
-  @ApiResponse({ status: 200, description: 'Email verified' })
-  @ApiResponse({ status: 400, description: 'Verification failed' })
-  async verifyEmail(@Body() body: { token: string }) {
-    try {
-      const result = await this.authService.verifyEmail(body.token);
-
-      if (result.success) {
-        return {
-          statusCode: HttpStatus.OK,
-          message: result.message,
-        };
-      } else {
-        throw new HttpException(
-          {
-            statusCode: HttpStatus.BAD_REQUEST,
-            message: result.message,
-            error: result.error,
-          },
-          HttpStatus.BAD_REQUEST,
-        );
-      }
-    } catch (error) {
-      if (error instanceof HttpException) {
-        throw error;
-      }
-      throw new HttpException(
-        {
-          statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-          message: 'An unexpected error occurred during email verification.',
+          message: 'An unexpected error occurred during token refresh.',
           error: error.message,
         },
         HttpStatus.INTERNAL_SERVER_ERROR,

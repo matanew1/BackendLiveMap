@@ -1,16 +1,33 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { CacheModule } from '@nestjs/cache-manager';
 import { APP_GUARD } from '@nestjs/core';
 import { LocationsModule } from './locations/locations.module';
 import { AuthModule } from './auth/auth.module';
+import { HealthModule } from './health/health.module';
+import {
+  databaseConfig,
+  supabaseConfig,
+  redisConfig,
+  appConfig,
+} from './config/configuration';
+import { ConfigValidationService } from './config/config-validation.service';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      load: [databaseConfig, supabaseConfig, redisConfig, appConfig],
+      validate: (config) => {
+        const validationService = new ConfigValidationService(
+          new ConfigService(config),
+          config,
+        );
+        validationService.validateConfiguration();
+        return config;
+      },
     }),
     ThrottlerModule.forRoot([
       {
@@ -18,21 +35,44 @@ import { AuthModule } from './auth/auth.module';
         limit: 10, // 10 requests per minute
       },
     ]),
-    CacheModule.register({
+    CacheModule.registerAsync({
       isGlobal: true,
-      store: 'redis',
-      host: process.env.REDIS_HOST || 'localhost',
-      port: process.env.REDIS_PORT || 6379,
+      imports: [ConfigModule],
+      useFactory: (configService: ConfigService) => ({
+        store: 'redis',
+        host: configService.get('redis.host'),
+        port: configService.get('redis.port'),
+      }),
+      inject: [ConfigService],
     }),
-    TypeOrmModule.forRoot({
-      type: 'postgres',
-      url: process.env.DATABASE_URL,
-      ssl: { rejectUnauthorized: false },
-      autoLoadEntities: true,
-      synchronize: true, // temporarily true to update schema
+    TypeOrmModule.forRootAsync({
+      imports: [ConfigModule],
+      useFactory: (configService: ConfigService) => ({
+        type: 'postgres',
+        url: configService.get('database.url'),
+        ssl:
+          configService.get('database.synchronize') === false
+            ? { rejectUnauthorized: false }
+            : false,
+        autoLoadEntities: true,
+        synchronize: false, // Use migrations instead
+        migrationsRun: false, // Don't run migrations automatically on startup
+        logging: configService.get('database.logging'),
+        migrations: ['dist/src/migrations/*.js'],
+        cli: {
+          migrationsDir: 'src/migrations',
+        },
+        extra: {
+          max: 20, // Connection pool size
+          idleTimeoutMillis: 30000,
+          connectionTimeoutMillis: 2000,
+        },
+      }),
+      inject: [ConfigService],
     }),
     LocationsModule,
     AuthModule,
+    HealthModule,
   ],
   providers: [
     {
