@@ -7,6 +7,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { LocationsModule } from './locations/locations.module';
 import { AuthModule } from './auth/auth.module';
 import { HealthModule } from './health/health.module';
+import { UploadModule } from './upload/upload.module';
 import {
   databaseConfig,
   supabaseConfig,
@@ -75,6 +76,7 @@ import { ConfigValidationService } from './config/config-validation.service';
     LocationsModule,
     AuthModule,
     HealthModule,
+    UploadModule,
   ],
   providers: [
     {
