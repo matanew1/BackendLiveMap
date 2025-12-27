@@ -63,9 +63,11 @@ import { ConfigValidationService } from './config/config-validation.service';
           migrationsDir: 'src/migrations',
         },
         extra: {
-          max: 20, // Connection pool size
+          max: 50, // Increased from 20
+          min: 5, // Maintain minimum connections
           idleTimeoutMillis: 30000,
           connectionTimeoutMillis: 2000,
+          acquireTimeoutMillis: 60000, // Prevent hanging connections
         },
       }),
       inject: [ConfigService],
