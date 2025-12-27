@@ -4,19 +4,22 @@ import { Repository } from 'typeorm';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import type { Cache } from 'cache-manager';
 import { UsersLocation } from './locations.entity';
+import { User } from '../auth/user.entity';
 
 @Injectable()
 export class LocationsService {
   constructor(
     @InjectRepository(UsersLocation)
     private readonly repo: Repository<UsersLocation>,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {
     // Database initialization moved to migrations
   }
 
   async saveLocation(userId: string, lat: number, lng: number): Promise<any> {
-    return this.repo.query(
+    const result = await this.repo.query(
       `
       INSERT INTO users_locations (user_id, location)
       VALUES ($1, ST_MakePoint($2, $3)::geography)
@@ -26,6 +29,13 @@ export class LocationsService {
       `,
       [userId, lng, lat],
     );
+
+    // Also update the user's lastLocation
+    await this.userRepo.update(userId, {
+      lastLocation: `SRID=4326;POINT(${lng} ${lat})`,
+    });
+
+    return result;
   }
 
   async getUsersNearby(

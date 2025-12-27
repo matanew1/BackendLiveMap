@@ -193,7 +193,9 @@ describe('AuthService', () => {
     });
   });
 
-  describe('uploadAvatar', () => {
+  // Removed uploadAvatar tests - functionality moved to upload.service
+
+  describe('deleteAvatar', () => {
     const mockFile = {
       buffer: Buffer.from('fake-image-data'),
       mimetype: 'image/jpeg',

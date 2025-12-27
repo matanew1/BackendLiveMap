@@ -5,7 +5,7 @@ A NestJS backend application for the Cy-Dog platform, built with TypeScript, Typ
 ## Features
 
 - 🔐 **Authentication**: User signup/signin with Supabase Auth
-- 📍 **Location Services**: Real-time location tracking with WebSocket support
+- 📍 **Location Services**: Real-time location tracking with WebSocket support and last known location storage
 - 🖼️ **Avatar Upload**: User avatar management with organized storage
 - 🏥 **Health Checks**: Application health monitoring
 - 📚 **API Documentation**: Swagger/OpenAPI documentation
@@ -111,17 +111,39 @@ Once the application is running, visit:
 - `POST /auth/signin` - User login
 - `POST /auth/signout` - User logout
 - `POST /auth/refresh` - Refresh access token
+- `GET /auth/profile/:userId` - Get user profile
+- `PATCH /auth/profile/:userId` - Update user profile (including lastLocation)
 - `POST /auth/upload-avatar` - Upload user avatar
 - `PATCH /auth/avatar` - Update existing user avatar
 - `DELETE /auth/avatar` - Delete user avatar
 
 ### Locations
-- `GET /locations` - Get locations
-- `POST /locations` - Create location
-- WebSocket events for real-time location updates
+- **WebSocket Events**:
+  - `update_location` - Update user location (saves to both users.lastLocation and users_locations table)
+  - `update_search_radius` - Update search radius for nearby users
+- **Real-time Events**:
+  - `location_updated` - Broadcasts location updates and nearby users
 
 ### Health
 - `GET /health` - Application health status
+
+## Location Features
+
+The application provides advanced location tracking capabilities:
+
+### Dual Location Storage
+- **users.lastLocation**: Stores the most recent user location directly in the users table for quick access
+- **users_locations table**: Maintains a separate geospatial table for complex queries and historical data
+
+### Real-time Updates
+- WebSocket-based location updates with instant broadcasting
+- Nearby users discovery with customizable search radius
+- Breed-based filtering for dog-specific social features
+
+### Geospatial Queries
+- PostGIS-powered distance calculations
+- Efficient spatial indexing for performance
+- Support for radius-based user discovery
 
 ## Supabase Setup
 

@@ -13,6 +13,6 @@ export class UsersLocation {
   })
   location: string;
 
-  @Column({ type: 'timestamp', default: () => 'now()' })
+  @Column({ type: 'timestamp', default: () => 'now()', nullable: false })
   last_updated: Date;
 }

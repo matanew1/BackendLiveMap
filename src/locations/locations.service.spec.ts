@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { LocationsService } from './locations.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { UsersLocation } from './locations.entity';
+import { User } from '../auth/user.entity';
 import { Repository } from 'typeorm';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
@@ -9,6 +10,7 @@ import { Cache } from 'cache-manager';
 describe('LocationsService', () => {
   let service: LocationsService;
   let repo: Repository<UsersLocation>;
+  let userRepo: Repository<User>;
   let cacheManager: Cache;
 
   const mockRepository = {
@@ -23,6 +25,10 @@ describe('LocationsService', () => {
       offset: jest.fn().mockReturnThis(),
       getRawMany: jest.fn().mockResolvedValue([]),
     })),
+  };
+
+  const mockUserRepository = {
+    update: jest.fn(),
   };
 
   const mockCacheManager = {
@@ -40,6 +46,10 @@ describe('LocationsService', () => {
           useValue: mockRepository,
         },
         {
+          provide: getRepositoryToken(User),
+          useValue: mockUserRepository,
+        },
+        {
           provide: CACHE_MANAGER,
           useValue: mockCacheManager,
         },
@@ -50,6 +60,7 @@ describe('LocationsService', () => {
     repo = module.get<Repository<UsersLocation>>(
       getRepositoryToken(UsersLocation),
     );
+    userRepo = module.get<Repository<User>>(getRepositoryToken(User));
     cacheManager = module.get<Cache>(CACHE_MANAGER);
   });
 
@@ -61,6 +72,7 @@ describe('LocationsService', () => {
     it('should save user location', async () => {
       const mockResult = [{ id: 1, user_id: 'user123' }];
       mockRepository.query.mockResolvedValue(mockResult);
+      mockUserRepository.update.mockResolvedValue({ affected: 1 });
 
       const result = await service.saveLocation(
         'user123',
@@ -73,6 +85,9 @@ describe('LocationsService', () => {
         expect.stringContaining('INSERT INTO users_locations'),
         ['user123', 34.890737, 32.081194],
       );
+      expect(mockUserRepository.update).toHaveBeenCalledWith('user123', {
+        lastLocation: 'SRID=4326;POINT(34.890737 32.081194)',
+      });
     });
   });
 
