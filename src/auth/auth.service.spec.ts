@@ -14,6 +14,13 @@ jest.mock('@supabase/supabase-js', () => ({
       signOut: jest.fn(),
       getUser: jest.fn(),
     },
+    storage: {
+      listBuckets: jest.fn(),
+      from: jest.fn(() => ({
+        upload: jest.fn(),
+        getPublicUrl: jest.fn(),
+      })),
+    },
   })),
 }));
 
@@ -50,6 +57,7 @@ describe('AuthService', () => {
             save: jest.fn(),
             findOne: jest.fn(),
             query: jest.fn(),
+            update: jest.fn(),
           },
         },
       ],
@@ -63,6 +71,13 @@ describe('AuthService', () => {
         signUp: jest.fn(),
         signInWithPassword: jest.fn(),
         getUser: jest.fn(),
+      },
+      storage: {
+        listBuckets: jest.fn(),
+        from: jest.fn(() => ({
+          upload: jest.fn(),
+          getPublicUrl: jest.fn(),
+        })),
       },
     };
     service['supabase'] = mockSupabase as any;
@@ -175,6 +190,196 @@ describe('AuthService', () => {
 
       expect(result.success).toBe(true);
       expect(result.data.id).toBe('123');
+    });
+  });
+
+  describe('uploadAvatar', () => {
+    const mockFile = {
+      buffer: Buffer.from('fake-image-data'),
+      mimetype: 'image/jpeg',
+      originalname: 'test.jpg',
+      size: 1024,
+    } as Express.Multer.File;
+
+    beforeEach(() => {
+      // Mock createClient for authenticated client
+      const mockCreateClient = jest.fn(() => ({
+        storage: {
+          listBuckets: jest.fn(),
+          from: jest.fn(() => ({
+            upload: jest.fn(),
+            getPublicUrl: jest.fn(),
+          })),
+        },
+      }));
+      (createClient as jest.Mock).mockImplementation(mockCreateClient);
+
+      // Reset the main supabase mock for each test
+      service['supabase'].storage.from.mockClear();
+    });
+
+    it('should upload avatar successfully', async () => {
+      // Mock bucket exists
+      service['supabase'].storage.listBuckets.mockResolvedValue({
+        data: [{ name: 'avatars' }],
+        error: null,
+      });
+
+      // Mock successful upload for authenticated client
+      const mockStorageFrom = {
+        upload: jest.fn().mockResolvedValue({
+          data: { path: 'user123-1234567890.jpg' },
+          error: null,
+        }),
+        getPublicUrl: jest.fn().mockReturnValue({
+          data: {
+            publicUrl: 'https://supabase-url/avatars/user123-1234567890.jpg',
+          },
+        }),
+      };
+
+      // Mock the createClient to return a client with the mocked storage
+      const mockAuthClient = {
+        storage: {
+          listBuckets: jest.fn().mockResolvedValue({
+            data: [{ name: 'avatars' }],
+            error: null,
+          }),
+          from: jest.fn().mockReturnValue(mockStorageFrom),
+        },
+      };
+      (createClient as jest.Mock).mockReturnValueOnce(mockAuthClient);
+
+      // Mock user update
+      jest.spyOn(service['userRepo'], 'update').mockResolvedValue({} as any);
+
+      const result = await service.uploadAvatar(
+        'user123',
+        mockFile,
+        'jwt-token',
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.message).toBe('Avatar uploaded successfully.');
+      expect(result.data.avatarUrl).toBe(
+        'https://supabase-url/avatars/user123-1234567890.jpg',
+      );
+      expect(service['userRepo'].update).toHaveBeenCalledWith('user123', {
+        avatarUrl: 'https://supabase-url/avatars/user123-1234567890.jpg',
+      });
+    });
+
+    it('should fail when avatars bucket does not exist', async () => {
+      // Mock bucket does not exist
+      service['supabase'].storage.listBuckets.mockResolvedValue({
+        data: [{ name: 'other-bucket' }],
+        error: null,
+      });
+
+      const result = await service.uploadAvatar('user123', mockFile);
+
+      expect(result.success).toBe(false);
+      expect(result.message).toBe(
+        'Avatars storage bucket not configured. Please create an "avatars" bucket in your Supabase dashboard with public access.',
+      );
+      expect(result.error).toBe('Bucket not found');
+    });
+
+    it('should fail when listing buckets fails', async () => {
+      // Mock list buckets error
+      service['supabase'].storage.listBuckets.mockResolvedValue({
+        data: null,
+        error: { message: 'Permission denied' },
+      });
+
+      const result = await service.uploadAvatar('user123', mockFile);
+
+      expect(result.success).toBe(false);
+      expect(result.message).toBe(
+        'Error checking storage buckets: Permission denied',
+      );
+      expect(result.error).toBe('Permission denied');
+    });
+
+    it('should fail when upload fails', async () => {
+      // Mock bucket exists
+      service['supabase'].storage.listBuckets.mockResolvedValue({
+        data: [{ name: 'avatars' }],
+        error: null,
+      });
+
+      // Mock upload error
+      const mockStorageFrom = {
+        upload: jest.fn().mockResolvedValue({
+          data: null,
+          error: { message: 'Upload failed: File too large' },
+        }),
+        getPublicUrl: jest.fn(),
+      };
+      service['supabase'].storage.from.mockReturnValue(mockStorageFrom);
+
+      const result = await service.uploadAvatar('user123', mockFile);
+
+      expect(result.success).toBe(false);
+      expect(result.message).toBe(
+        'Error uploading avatar: Upload failed: File too large',
+      );
+      expect(result.error).toBe('Upload failed: File too large');
+    });
+
+    it('should handle unexpected errors', async () => {
+      // Mock bucket exists
+      service['supabase'].storage.listBuckets.mockResolvedValue({
+        data: [{ name: 'avatars' }],
+        error: null,
+      });
+
+      // Mock upload throws error
+      const mockStorageFrom = {
+        upload: jest.fn().mockRejectedValue(new Error('Network error')),
+        getPublicUrl: jest.fn(),
+      };
+      service['supabase'].storage.from.mockReturnValue(mockStorageFrom);
+
+      const result = await service.uploadAvatar('user123', mockFile);
+
+      expect(result.success).toBe(false);
+      expect(result.message).toBe('Error uploading avatar.');
+      expect(result.error).toBe('Network error');
+    });
+
+    it('should use authenticated client when token is provided', async () => {
+      // Mock bucket exists
+      service['supabase'].storage.listBuckets.mockResolvedValue({
+        data: [{ name: 'avatars' }],
+        error: null,
+      });
+
+      // Mock successful upload
+      const mockStorageFrom = service['supabase'].storage.from('avatars');
+      mockStorageFrom.upload.mockResolvedValue({
+        data: { path: 'user123-1234567890.jpg' },
+        error: null,
+      });
+      mockStorageFrom.getPublicUrl.mockReturnValue({
+        data: {
+          publicUrl: 'https://supabase-url/avatars/user123-1234567890.jpg',
+        },
+      });
+
+      // Mock user update
+      jest.spyOn(service['userRepo'], 'update').mockResolvedValue({} as any);
+
+      await service.uploadAvatar('user123', mockFile, 'jwt-token');
+
+      // Verify createClient was called with token
+      expect(createClient).toHaveBeenCalledWith('mock-url', 'mock-key', {
+        global: {
+          headers: {
+            Authorization: `Bearer jwt-token`,
+          },
+        },
+      });
     });
   });
 });

@@ -25,7 +25,7 @@ export class SignInDto {
   @IsEmail()
   email: string;
 
-  @ApiProperty({ example: 'strongpassword123', description: 'User password' })
+  @ApiProperty({ example: 'Lily2702!!', description: 'User password' })
   @IsString()
   @MinLength(8)
   password: string;
@@ -62,4 +62,13 @@ export class UpdateProfileDto {
   @IsNumber()
   @IsOptional()
   dogAge?: number;
+
+  @ApiProperty({
+    example: 'https://supabase-url/avatar.jpg',
+    description: 'Avatar URL',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  avatarUrl?: string;
 }

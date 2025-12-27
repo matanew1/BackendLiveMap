@@ -31,6 +31,9 @@ export class User {
   @Column({ nullable: true })
   dogAge: number;
 
+  @Column({ nullable: true })
+  avatarUrl: string;
+
   @CreateDateColumn()
   created_at: Date;
 }

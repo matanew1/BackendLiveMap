@@ -10,6 +10,8 @@ import {
   Param,
   Patch,
   Req,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -17,7 +19,10 @@ import {
   ApiResponse,
   ApiBearerAuth,
   ApiExtraModels,
+  ApiConsumes,
+  ApiBody,
 } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
 import type { Request } from 'express';
 
 declare module 'express' {
@@ -388,6 +393,103 @@ export class AuthController {
         {
           statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
           message: 'An unexpected error occurred while updating profile.',
+          error: error.message,
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Post('upload-avatar')
+  @ApiOperation({
+    summary: 'Upload user avatar',
+    description:
+      'Upload a new avatar image for the authenticated user. The image will be stored in Supabase Storage under users/{userId}/avatar.jpg and overwrite any existing avatar.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Avatar uploaded successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        statusCode: { type: 'number', example: 200 },
+        message: { type: 'string', example: 'Avatar uploaded successfully.' },
+        data: {
+          type: 'object',
+          properties: {
+            avatarUrl: {
+              type: 'string',
+              example:
+                'https://your-project.supabase.co/storage/v1/object/public/avatars/users/user123/avatar.jpg',
+            },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request - invalid file or storage error',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - invalid or missing JWT token',
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    description: 'Avatar image file (JPEG, PNG, etc.)',
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+          description: 'Image file to upload as avatar',
+        },
+      },
+      required: ['file'],
+    },
+  })
+  @ApiBearerAuth('JWT-auth')
+  @UseGuards(SupabaseAuthGuard)
+  @UseInterceptors(FileInterceptor('file'))
+  async uploadAvatar(
+    @Req() request: Request,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    try {
+      const authHeader = request.headers.authorization;
+      const token = authHeader?.replace('Bearer ', '');
+      const result = await this.authService.uploadAvatar(
+        request.user.id,
+        file,
+        token,
+      );
+
+      if (result.success) {
+        return {
+          statusCode: HttpStatus.OK,
+          message: result.message,
+          data: result.data,
+        };
+      } else {
+        throw new HttpException(
+          {
+            statusCode: HttpStatus.BAD_REQUEST,
+            message: result.message,
+            error: result.error,
+          },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        {
+          statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+          message: 'An unexpected error occurred while uploading avatar.',
           error: error.message,
         },
         HttpStatus.INTERNAL_SERVER_ERROR,

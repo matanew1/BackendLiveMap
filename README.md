@@ -1,62 +1,61 @@
-# Cy-Dog Backend API
+# Cy-Dog Backend
 
-A NestJS-based backend API for the Cy-Dog application, providing authentication, location tracking, and real-time communication features for dog owners.
+A NestJS backend application for the Cy-Dog platform, built with TypeScript, TypeORM, Supabase, and PostgreSQL with PostGIS.
 
 ## Features
 
 - 🔐 **Authentication**: User signup/signin with Supabase Auth
-- 📍 **Location Tracking**: Real-time GPS location sharing with WebSocket
-- 🐕 **Dog Profiles**: User profiles with dog information
-- 🔄 **Real-time Updates**: WebSocket-based location broadcasting
-- 📊 **Health Monitoring**: Application health checks
-- 📚 **API Documentation**: Interactive Swagger UI
+- 📍 **Location Services**: Real-time location tracking with WebSocket support
+- 🖼️ **Avatar Upload**: User avatar management with organized storage
+- 🏥 **Health Checks**: Application health monitoring
+- 📚 **API Documentation**: Swagger/OpenAPI documentation
+- 🗄️ **Database**: PostgreSQL with PostGIS for geospatial data
+- 🔄 **Real-time**: Socket.IO integration for live updates
+- 🧪 **Testing**: Comprehensive unit and e2e tests with Jest
 
 ## Tech Stack
 
 - **Framework**: NestJS
 - **Language**: TypeScript
-- **Database**: PostgreSQL with PostGIS
-- **Authentication**: Supabase Auth
-- **Cache**: Redis
-- **WebSocket**: Socket.IO
+- **Database**: PostgreSQL + PostGIS
 - **ORM**: TypeORM
-- **Validation**: class-validator
-- **Documentation**: Swagger/OpenAPI
+- **Authentication**: Supabase Auth
+- **Storage**: Supabase Storage
+- **Real-time**: Socket.IO
+- **Caching**: Redis
+- **Testing**: Jest
+- **API Docs**: Swagger/OpenAPI
 
-## Quick Start
+## Prerequisites
 
-### Prerequisites
-
-- Node.js (v18+)
+- Node.js 18+
 - pnpm
 - PostgreSQL with PostGIS
-- Redis
+- Redis (optional, for caching)
 - Supabase account
 
-### Installation
+## Installation
 
+1. Clone the repository:
 ```bash
-# Clone the repository
 git clone <repository-url>
 cd cy-dog-backend
+```
 
-# Install dependencies
+2. Install dependencies:
+```bash
 pnpm install
 ```
 
-### Environment Setup
-
-Copy the environment file and configure:
-
+3. Set up environment variables:
 ```bash
 cp .env.example .env
 ```
 
-Update `.env` with your configuration:
-
+Edit `.env` with your configuration:
 ```env
 # Database
-DATABASE_URL=postgresql://username:password@localhost:5432/cy_dog_db
+DATABASE_URL=postgresql://user:password@localhost:5432/cy_dog
 
 # Supabase
 SUPABASE_URL=https://your-project.supabase.co
@@ -64,407 +63,135 @@ SUPABASE_ANON_KEY=your-anon-key
 
 # Server
 PORT=3000
-CORS_ORIGIN=http://localhost:8081
+HOST=localhost
 
-# Redis
-REDIS_HOST=localhost
-REDIS_PORT=6379
+# Redis (optional)
+REDIS_URL=redis://localhost:6379
 ```
 
-### Running the Application
-
+4. Set up the database:
 ```bash
-# Development mode
-pnpm run start:dev
+pnpm run migration:run
+```
 
-# Production build
+5. Seed the database (optional):
+```bash
+pnpm run seed
+```
+
+## Running the Application
+
+### Development
+```bash
+pnpm run start:dev
+```
+
+### Production
+```bash
 pnpm run build
 pnpm run start:prod
 ```
 
-### Database Setup
-
+### Docker
 ```bash
-# Run migrations
-pnpm run migration:run
-
-# Seed initial data (if available)
-pnpm run seed
+docker build -t cy-dog-backend .
+docker run -p 3000:3000 cy-dog-backend
 ```
 
 ## API Documentation
 
-### Base URL
-```
-http://localhost:3000
-```
+Once the application is running, visit:
+- **Swagger UI**: http://localhost:3000/api
+- **Health Check**: http://localhost:3000/health
+
+## API Endpoints
 
 ### Authentication
-All protected endpoints require a Bearer token:
-```
-Authorization: Bearer <your-jwt-token>
-```
+- `POST /auth/signup` - User registration
+- `POST /auth/signin` - User login
+- `POST /auth/signout` - User logout
+- `POST /auth/refresh` - Refresh access token
+- `POST /auth/upload-avatar` - Upload user avatar
 
-## REST API Endpoints
+### Locations
+- `GET /locations` - Get locations
+- `POST /locations` - Create location
+- WebSocket events for real-time location updates
 
-### Authentication Module (`/auth`)
+### Health
+- `GET /health` - Application health status
 
-#### 1. Sign Up
-**POST** `/auth/signup`
+## Supabase Setup
 
-Register a new user account.
+### Storage Bucket
+1. Create an "avatars" bucket in Supabase Storage
+2. Make it public
+3. Add RLS policies:
 
-**Request Body:**
-```json
-{
-  "email": "user@example.com",
-  "password": "strongpassword123"
-}
-```
-
-**Response (201):**
-```json
-{
-  "statusCode": 201,
-  "message": "Account created successfully. Please check your email for verification.",
-  "data": {
-    "user": {
-      "id": "uuid",
-      "email": "user@example.com"
-    },
-    "session": {
-      "access_token": "jwt_token",
-      "refresh_token": "refresh_token"
-    }
-  }
-}
+**Insert Policy** (for uploads):
+```sql
+CREATE POLICY "Allow authenticated users to upload" ON storage.objects
+FOR INSERT WITH CHECK (
+  bucket_id = 'avatars' AND
+  auth.role() = 'authenticated'
+);
 ```
 
-#### 2. Sign In
-**POST** `/auth/signin`
-
-Authenticate user.
-
-**Request Body:**
-```json
-{
-  "email": "user@example.com",
-  "password": "strongpassword123"
-}
+**Select Policy** (for viewing):
+```sql
+CREATE POLICY "Allow public access to view" ON storage.objects
+FOR SELECT USING (bucket_id = 'avatars');
 ```
 
-**Response (200):**
-```json
-{
-  "statusCode": 200,
-  "message": "Signed in successfully.",
-  "data": {
-    "user": {
-      "id": "uuid",
-      "email": "user@example.com"
-    },
-    "session": {
-      "access_token": "jwt_token",
-      "refresh_token": "refresh_token"
-    }
-  }
-}
+### Avatar Storage Structure
+Avatars are stored in the following structure:
+```
+avatars/
+  users/
+    {userId}/
+      avatar.jpg
 ```
 
-#### 3. Sign Out
-**POST** `/auth/signout`
-
-Sign out current user.
-
-**Headers:** `Authorization: Bearer <token>`
-
-**Response (200):**
-```json
-{
-  "statusCode": 200,
-  "message": "Signed out successfully."
-}
+Frontend can access avatars via:
+```
+https://your-project.supabase.co/storage/v1/object/public/avatars/users/{userId}/avatar.jpg
 ```
 
-#### 4. Get Current User
-**GET** `/auth/me`
+## Testing
 
-Get authenticated user information.
-
-**Headers:** `Authorization: Bearer <token>`
-
-**Response (200):**
-```json
-{
-  "statusCode": 200,
-  "message": "User information retrieved successfully.",
-  "data": {
-    "user": {
-      "id": "uuid",
-      "email": "user@example.com"
-    },
-    "session": {
-      "access_token": "jwt_token",
-      "refresh_token": "refresh_token"
-    }
-  }
-}
+### Unit Tests
+```bash
+pnpm run test
 ```
 
-#### 5. Refresh Token
-**POST** `/auth/refresh`
-
-Refresh access token.
-
-**Request Body:**
-```json
-{
-  "refreshToken": "refresh_token_here"
-}
+### E2E Tests
+```bash
+pnpm run test:e2e
 ```
 
-**Response (200):**
-```json
-{
-  "statusCode": 200,
-  "message": "Token refreshed successfully.",
-  "data": {
-    "user": {
-      "id": "uuid",
-      "email": "user@example.com"
-    },
-    "session": {
-      "access_token": "new_jwt_token",
-      "refresh_token": "new_refresh_token"
-    }
-  }
-}
+### Test Coverage
+```bash
+pnpm run test:cov
 ```
 
-#### 6. Get User Profile
-**GET** `/auth/profile`
+## Database Migrations
 
-Get user profile with dog information.
-
-**Headers:** `Authorization: Bearer <token>`
-
-**Response (200):**
-```json
-{
-  "statusCode": 200,
-  "message": "User profile retrieved.",
-  "data": {
-    "id": "uuid",
-    "email": "user@example.com",
-    "dogName": "Buddy",
-    "dogBreed": "Golden Retriever",
-    "dogAge": 3,
-    "role": "USER"
-  }
-}
+### Create Migration
+```bash
+pnpm run migration:create -- -n MigrationName
 ```
 
-#### 7. Update User Profile
-**PATCH** `/auth/profile`
-
-Update user profile information.
-
-**Headers:** `Authorization: Bearer <token>`
-
-**Request Body:**
-```json
-{
-  "dogName": "Buddy",
-  "dogBreed": "Golden Retriever",
-  "dogAge": 3
-}
+### Run Migrations
+```bash
+pnpm run migration:run
 ```
 
-**Response (200):**
-```json
-{
-  "statusCode": 200,
-  "message": "Profile updated."
-}
+### Revert Migration
+```bash
+pnpm run migration:revert
 ```
 
-#### 8. Update User Role (Admin Only)
-**PATCH** `/auth/role/:userId`
-
-Update user role (admin only).
-
-**Headers:** `Authorization: Bearer <admin_token>`
-
-**URL Params:** `userId` (string)
-
-**Request Body:**
-```json
-{
-  "role": "ADMIN"
-}
-```
-
-**Response (200):**
-```json
-{
-  "statusCode": 200,
-  "message": "User role updated."
-}
-```
-
-### Health Check Module (`/health`)
-
-#### 1. Health Check
-**GET** `/health`
-
-Check application health status.
-
-**Response (200):**
-```json
-{
-  "status": "ok",
-  "info": {
-    "database": {
-      "status": "up"
-    },
-    "memory_heap": {
-      "status": "up"
-    },
-    "memory_rss": {
-      "status": "up"
-    }
-  },
-  "error": {},
-  "details": {
-    "database": {
-      "status": "up"
-    },
-    "memory_heap": {
-      "status": "up",
-      "memory_heap": {
-        "used": 123456789,
-        "available": 150000000
-      }
-    },
-    "memory_rss": {
-      "status": "up",
-      "memory_rss": {
-        "used": 123456789,
-        "available": 150000000
-      }
-    }
-  }
-}
-```
-
-## WebSocket Events
-
-**Connection URL:** `ws://localhost:3000`
-
-### Events
-
-#### 1. Update Location
-**Event:** `update_location`
-
-Update user's location and get nearby users.
-
-**Client → Server:**
-```json
-{
-  "userId": "uuid",
-  "lat": 37.7749,
-  "lng": -122.4194,
-  "filters": {
-    "breed": "Golden Retriever"
-  }
-}
-```
-
-#### 2. Update Search Radius
-**Event:** `update_search_radius`
-
-Update search radius for nearby users.
-
-**Client → Server:**
-```json
-{
-  "userId": "uuid",
-  "radius": 1000,
-  "filters": {
-    "breed": "Labrador"
-  }
-}
-```
-
-#### 3. Location Updated (Broadcast)
-**Event:** `location_updated`
-
-Broadcast location updates and nearby users.
-
-**Server → All Clients:**
-```json
-{
-  "updated": {
-    "user_id": "uuid",
-    "lat": 37.7749,
-    "lng": -122.4194
-  },
-  "nearby": [
-    {
-      "id": "uuid",
-      "email": "user@example.com",
-      "dogName": "Buddy",
-      "dogBreed": "Golden Retriever",
-      "dogAge": 3,
-      "lat": 37.7750,
-      "lng": -122.4195,
-      "distance": 150.5
-    }
-  ]
-}
-```
-
-### WebSocket Usage Example
-
-```javascript
-import io from 'socket.io-client';
-
-const socket = io('http://localhost:3000');
-
-// Connect
-socket.on('connect', () => {
-  console.log('Connected to server');
-});
-
-// Update location
-socket.emit('update_location', {
-  userId: 'user-uuid',
-  lat: 37.7749,
-  lng: -122.4194,
-  filters: { breed: 'Golden Retriever' }
-});
-
-// Listen for updates
-socket.on('location_updated', (data) => {
-  console.log('Location updated:', data);
-});
-
-// Update search radius
-socket.emit('update_search_radius', {
-  userId: 'user-uuid',
-  radius: 2000,
-  filters: { breed: 'Labrador' }
-});
-
-// Disconnect
-socket.on('disconnect', () => {
-  console.log('Disconnected from server');
-});
-```
-
-## Development
-
-### Project Structure
+## Project Structure
 
 ```
 src/
@@ -473,80 +200,20 @@ src/
 │   ├── auth.service.ts
 │   ├── auth.guard.ts
 │   ├── user.entity.ts
-│   └── auth.service.spec.ts
+│   └── dto/
 ├── common/               # Shared utilities
+│   ├── decorators/
 │   ├── dto/
 │   ├── filters/
 │   ├── guards/
 │   └── interceptors/
 ├── config/               # Configuration
 ├── health/               # Health checks
-├── locations/            # Location tracking
-│   ├── locations.gateway.ts
-│   ├── locations.service.ts
-│   └── locations.service.spec.ts
-├── migrations/           # Database migrations
-├── app.module.ts         # Main application module
-├── data-source.ts        # Database configuration
-└── main.ts               # Application entry point
+├── locations/            # Location services
+└── migrations/           # Database migrations
 ```
 
-### Available Scripts
-
-```bash
-# Development
-pnpm run start:dev          # Start in watch mode
-pnpm run start:prod         # Start production build
-
-# Building
-pnpm run build              # Build the application
-pnpm run format             # Format code with Prettier
-
-# Testing
-pnpm run test               # Run unit tests
-pnpm run test:e2e           # Run e2e tests
-pnpm run test:cov           # Run tests with coverage
-
-# Database
-pnpm run migration:run      # Run migrations
-pnpm run migration:generate # Generate migration
-pnpm run migration:create   # Create migration
-
-# Linting
-pnpm run lint               # Run ESLint
-pnpm run lint:fix           # Fix linting issues
-```
-
-### API Documentation
-
-Interactive API documentation is available at:
-- **Swagger UI**: `http://localhost:3000/api`
-- **Health Check**: `http://localhost:3000/health`
-
-## Deployment
-
-### Docker
-
-```dockerfile
-# Build the application
-FROM node:18-alpine AS builder
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci
-COPY . .
-RUN npm run build
-
-# Production image
-FROM node:18-alpine AS production
-WORKDIR /app
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/package*.json ./
-EXPOSE 3000
-CMD ["npm", "run", "start:prod"]
-```
-
-### Environment Variables
+## Environment Variables
 
 | Variable | Description | Default |
 |----------|-------------|---------|
@@ -555,9 +222,7 @@ CMD ["npm", "run", "start:prod"]
 | `SUPABASE_ANON_KEY` | Supabase anonymous key | Required |
 | `PORT` | Server port | 3000 |
 | `HOST` | Server host | localhost |
-| `CORS_ORIGIN` | Allowed CORS origins | http://localhost:3000 |
-| `REDIS_HOST` | Redis host | localhost |
-| `REDIS_PORT` | Redis port | 6379 |
+| `REDIS_URL` | Redis connection URL | Optional |
 
 ## Contributing
 
@@ -571,54 +236,165 @@ CMD ["npm", "run", "start:prod"]
 
 This project is licensed under the MIT License.
 
-## Support
+## Getting started
 
-For support, please contact the development team or create an issue in the repository.
-$ pnpm run test
+### Install the CLI
 
-# e2e tests
-$ pnpm run test:e2e
-
-# test coverage
-$ pnpm run test:cov
-```
-
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+Available via [NPM](https://www.npmjs.com) as dev dependency. To install:
 
 ```bash
-$ pnpm install -g @nestjs/mau
-$ mau deploy
+npm i supabase --save-dev
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+When installing with yarn 4, you need to disable experimental fetch with the following nodejs config.
 
-## Resources
+```
+NODE_OPTIONS=--no-experimental-fetch yarn add supabase
+```
 
-Check out a few resources that may come in handy when working with NestJS:
+> **Note**
+For Bun versions below v1.0.17, you must add `supabase` as a [trusted dependency](https://bun.sh/guides/install/trusted) before running `bun add -D supabase`.
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+<details>
+  <summary><b>macOS</b></summary>
 
-## Support
+  Available via [Homebrew](https://brew.sh). To install:
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+  ```sh
+  brew install supabase/tap/supabase
+  ```
 
-## Stay in touch
+  To install the beta release channel:
+  
+  ```sh
+  brew install supabase/tap/supabase-beta
+  brew link --overwrite supabase-beta
+  ```
+  
+  To upgrade:
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+  ```sh
+  brew upgrade supabase
+  ```
+</details>
 
-## License
+<details>
+  <summary><b>Windows</b></summary>
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+  Available via [Scoop](https://scoop.sh). To install:
+
+  ```powershell
+  scoop bucket add supabase https://github.com/supabase/scoop-bucket.git
+  scoop install supabase
+  ```
+
+  To upgrade:
+
+  ```powershell
+  scoop update supabase
+  ```
+</details>
+
+<details>
+  <summary><b>Linux</b></summary>
+
+  Available via [Homebrew](https://brew.sh) and Linux packages.
+
+  #### via Homebrew
+
+  To install:
+
+  ```sh
+  brew install supabase/tap/supabase
+  ```
+
+  To upgrade:
+
+  ```sh
+  brew upgrade supabase
+  ```
+
+  #### via Linux packages
+
+  Linux packages are provided in [Releases](https://github.com/supabase/cli/releases). To install, download the `.apk`/`.deb`/`.rpm`/`.pkg.tar.zst` file depending on your package manager and run the respective commands.
+
+  ```sh
+  sudo apk add --allow-untrusted <...>.apk
+  ```
+
+  ```sh
+  sudo dpkg -i <...>.deb
+  ```
+
+  ```sh
+  sudo rpm -i <...>.rpm
+  ```
+
+  ```sh
+  sudo pacman -U <...>.pkg.tar.zst
+  ```
+</details>
+
+<details>
+  <summary><b>Other Platforms</b></summary>
+
+  You can also install the CLI via [go modules](https://go.dev/ref/mod#go-install) without the help of package managers.
+
+  ```sh
+  go install github.com/supabase/cli@latest
+  ```
+
+  Add a symlink to the binary in `$PATH` for easier access:
+
+  ```sh
+  ln -s "$(go env GOPATH)/bin/cli" /usr/bin/supabase
+  ```
+
+  This works on other non-standard Linux distros.
+</details>
+
+<details>
+  <summary><b>Community Maintained Packages</b></summary>
+
+  Available via [pkgx](https://pkgx.sh/). Package script [here](https://github.com/pkgxdev/pantry/blob/main/projects/supabase.com/cli/package.yml).
+  To install in your working directory:
+
+  ```bash
+  pkgx install supabase
+  ```
+
+  Available via [Nixpkgs](https://nixos.org/). Package script [here](https://github.com/NixOS/nixpkgs/blob/master/pkgs/development/tools/supabase-cli/default.nix).
+</details>
+
+### Run the CLI
+
+```bash
+supabase bootstrap
+```
+
+Or using npx:
+
+```bash
+npx supabase bootstrap
+```
+
+The bootstrap command will guide you through the process of setting up a Supabase project using one of the [starter](https://github.com/supabase-community/supabase-samples/blob/main/samples.json) templates.
+
+## Docs
+
+Command & config reference can be found [here](https://supabase.com/docs/reference/cli/about).
+
+## Breaking changes
+
+We follow semantic versioning for changes that directly impact CLI commands, flags, and configurations.
+
+However, due to dependencies on other service images, we cannot guarantee that schema migrations, seed.sql, and generated types will always work for the same CLI major version. If you need such guarantees, we encourage you to pin a specific version of CLI in package.json.
+
+## Developing
+
+To run from source:
+
+```sh
+# Go >= 1.22
+go run . help
+```

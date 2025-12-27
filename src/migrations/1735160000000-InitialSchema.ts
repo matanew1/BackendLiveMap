@@ -15,6 +15,7 @@ export class InitialSchema1735160000000 implements MigrationInterface {
         "dogName" VARCHAR,
         "dogBreed" VARCHAR,
         "dogAge" INTEGER,
+        "avatarUrl" VARCHAR,
         created_at TIMESTAMP DEFAULT NOW()
       );
     `);

@@ -218,4 +218,81 @@ export class AuthService {
       };
     }
   }
+
+  async uploadAvatar(
+    userId: string,
+    file: Express.Multer.File,
+    token?: string,
+  ): Promise<ApiResponse> {
+    try {
+      const fileName = `users/${userId}/avatar.jpg`; // Organize by user folders
+
+      // Create authenticated client if token provided
+      const client = token
+        ? createClient(
+            this.configService.get<string>('supabase.url')!,
+            this.configService.get<string>('supabase.anonKey')!,
+            {
+              global: {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                },
+              },
+            },
+          )
+        : this.supabase;
+
+      // Try to upload the file directly to avatars bucket
+      console.log('Attempting to upload file to avatars bucket...');
+      const { data, error } = await client.storage
+        .from('avatars') // assuming bucket name is 'avatars'
+        .upload(fileName, file.buffer, {
+          contentType: file.mimetype,
+          upsert: true, // Allow overwriting existing avatar
+        });
+
+      if (error) {
+        console.error('Supabase storage upload error:', error);
+        // If the error is about bucket not existing, give a clearer message
+        if (
+          error.message.includes('not found') ||
+          error.message.includes('does not exist')
+        ) {
+          return {
+            success: false,
+            message:
+              'Avatars storage bucket does not exist. Please create an "avatars" bucket in your Supabase dashboard with public access.',
+            error: error.message,
+          };
+        }
+        return {
+          success: false,
+          message: `Error uploading avatar: ${error.message}`,
+          error: error.message,
+        };
+      }
+
+      console.log('Upload successful, getting public URL...');
+
+      const { data: publicUrl } = client.storage
+        .from('avatars')
+        .getPublicUrl(fileName);
+
+      // Update user avatarUrl
+      await this.userRepo.update(userId, { avatarUrl: publicUrl.publicUrl });
+
+      return {
+        success: true,
+        message: 'Avatar uploaded successfully.',
+        data: { avatarUrl: publicUrl.publicUrl },
+      };
+    } catch (error) {
+      console.error('Unexpected error in uploadAvatar:', error);
+      return {
+        success: false,
+        message: 'Error uploading avatar.',
+        error: error.message,
+      };
+    }
+  }
 }
