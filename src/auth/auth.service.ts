@@ -295,4 +295,79 @@ export class AuthService {
       };
     }
   }
+
+  async updateAvatar(
+    userId: string,
+    file: Express.Multer.File,
+    token?: string,
+  ): Promise<ApiResponse> {
+    try {
+      // Check if user exists and has an existing avatar
+      const user = await this.userRepo.findOne({ where: { id: userId } });
+      if (!user) {
+        return ApiResponse.error('User not found.');
+      }
+
+      const fileName = `users/${userId}/avatar.jpg`; // Same path as upload
+
+      // Create authenticated client if token provided
+      const client = token
+        ? createClient(
+            this.configService.get<string>('supabase.url')!,
+            this.configService.get<string>('supabase.anonKey')!,
+            {
+              global: {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                },
+              },
+            },
+          )
+        : this.supabase;
+
+      console.log('Updating existing avatar for user:', userId);
+
+      // Upload new avatar (will overwrite existing)
+      const { data, error } = await client.storage
+        .from('avatars')
+        .upload(fileName, file.buffer, {
+          contentType: file.mimetype,
+          upsert: true, // Always overwrite existing avatar
+        });
+
+      if (error) {
+        console.error('Supabase storage update error:', error);
+        return {
+          success: false,
+          message: `Error updating avatar: ${error.message}`,
+          error: error.message,
+        };
+      }
+
+      console.log('Avatar updated successfully, getting public URL...');
+
+      const { data: publicUrl } = client.storage
+        .from('avatars')
+        .getPublicUrl(fileName);
+
+      // Update user avatarUrl in database
+      await this.userRepo.update(userId, { avatarUrl: publicUrl.publicUrl });
+
+      return {
+        success: true,
+        message: 'Avatar updated successfully.',
+        data: {
+          avatarUrl: publicUrl.publicUrl,
+          previousAvatarUrl: user.avatarUrl,
+        },
+      };
+    } catch (error) {
+      console.error('Unexpected error in updateAvatar:', error);
+      return {
+        success: false,
+        message: 'Error updating avatar.',
+        error: error.message,
+      };
+    }
+  }
 }

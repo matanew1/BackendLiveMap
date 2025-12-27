@@ -372,6 +372,94 @@ describe('AuthService', () => {
 
       await service.uploadAvatar('user123', mockFile, 'jwt-token');
 
+    });
+  });
+
+  describe('updateAvatar', () => {
+    const mockFile = {
+      buffer: Buffer.from('fake image data'),
+      mimetype: 'image/jpeg',
+      originalname: 'avatar.jpg',
+    } as Express.Multer.File;
+
+    it('should update avatar successfully', async () => {
+      // Mock user lookup
+      const mockUser = { id: 'user123', avatarUrl: 'old-avatar-url' };
+      jest.spyOn(service['userRepo'], 'findOne').mockResolvedValue(mockUser as any);
+
+      // Mock Supabase storage
+      const mockUpload = jest.fn().mockResolvedValue({ data: {}, error: null });
+      const mockGetPublicUrl = jest.fn().mockReturnValue({ data: { publicUrl: 'new-avatar-url' } });
+
+      service['supabase'].storage.from.mockReturnValue({
+        upload: mockUpload,
+        getPublicUrl: mockGetPublicUrl,
+      });
+
+      // Mock user update
+      jest.spyOn(service['userRepo'], 'update').mockResolvedValue({} as any);
+
+      const result = await service.updateAvatar('user123', mockFile);
+
+      expect(result.success).toBe(true);
+      expect(result.message).toBe('Avatar updated successfully.');
+      expect(result.data.avatarUrl).toBe('new-avatar-url');
+      expect(result.data.previousAvatarUrl).toBe('old-avatar-url');
+      expect(mockUpload).toHaveBeenCalledWith('users/user123/avatar.jpg', mockFile.buffer, {
+        contentType: 'image/jpeg',
+        upsert: true,
+      });
+    });
+
+    it('should return error if user not found', async () => {
+      jest.spyOn(service['userRepo'], 'findOne').mockResolvedValue(null);
+
+      const result = await service.updateAvatar('user123', mockFile);
+
+      expect(result.success).toBe(false);
+      expect(result.message).toBe('User not found.');
+    });
+
+    it('should handle storage upload error', async () => {
+      // Mock user lookup
+      const mockUser = { id: 'user123', avatarUrl: null };
+      jest.spyOn(service['userRepo'], 'findOne').mockResolvedValue(mockUser as any);
+
+      // Mock Supabase storage error
+      const mockUpload = jest.fn().mockResolvedValue({
+        data: null,
+        error: { message: 'Storage error' }
+      });
+
+      service['supabase'].storage.from.mockReturnValue({
+        upload: mockUpload,
+      });
+
+      const result = await service.updateAvatar('user123', mockFile);
+
+      expect(result.success).toBe(false);
+      expect(result.message).toBe('Error updating avatar: Storage error');
+    });
+
+    it('should use authenticated client when token provided', async () => {
+      // Mock user lookup
+      const mockUser = { id: 'user123', avatarUrl: null };
+      jest.spyOn(service['userRepo'], 'findOne').mockResolvedValue(mockUser as any);
+
+      // Mock Supabase storage
+      const mockUpload = jest.fn().mockResolvedValue({ data: {}, error: null });
+      const mockGetPublicUrl = jest.fn().mockReturnValue({ data: { publicUrl: 'new-avatar-url' } });
+
+      service['supabase'].storage.from.mockReturnValue({
+        upload: mockUpload,
+        getPublicUrl: mockGetPublicUrl,
+      });
+
+      // Mock user update
+      jest.spyOn(service['userRepo'], 'update').mockResolvedValue({} as any);
+
+      await service.updateAvatar('user123', mockFile, 'jwt-token');
+
       // Verify createClient was called with token
       expect(createClient).toHaveBeenCalledWith('mock-url', 'mock-key', {
         global: {

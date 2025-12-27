@@ -496,4 +496,99 @@ export class AuthController {
       );
     }
   }
+
+  @Patch('avatar')
+  @ApiOperation({
+    summary: 'Update user avatar',
+    description: 'Update the existing avatar image for the authenticated user. This will replace the current avatar with a new image.'
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Avatar updated successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        statusCode: { type: 'number', example: 200 },
+        message: { type: 'string', example: 'Avatar updated successfully.' },
+        data: {
+          type: 'object',
+          properties: {
+            avatarUrl: {
+              type: 'string',
+              example: 'https://your-project.supabase.co/storage/v1/object/public/avatars/users/user123/avatar.jpg'
+            },
+            previousAvatarUrl: {
+              type: 'string',
+              nullable: true,
+              example: 'https://your-project.supabase.co/storage/v1/object/public/avatars/users/user123/avatar.jpg'
+            }
+          }
+        }
+      }
+    }
+  })
+  @ApiResponse({ status: 400, description: 'Bad request - invalid file or storage error' })
+  @ApiResponse({ status: 401, description: 'Unauthorized - invalid or missing JWT token' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    description: 'New avatar image file (JPEG, PNG, etc.)',
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+          description: 'New image file to replace current avatar'
+        },
+      },
+      required: ['file']
+    },
+  })
+  @ApiBearerAuth('JWT-auth')
+  @UseGuards(SupabaseAuthGuard)
+  @UseInterceptors(FileInterceptor('file'))
+  async updateAvatar(
+    @Req() request: Request,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    try {
+      const authHeader = request.headers.authorization;
+      const token = authHeader?.replace('Bearer ', '');
+      const result = await this.authService.updateAvatar(
+        request.user.id,
+        file,
+        token,
+      );
+
+      if (result.success) {
+        return {
+          statusCode: HttpStatus.OK,
+          message: result.message,
+          data: result.data,
+        };
+      } else {
+        throw new HttpException(
+          {
+            statusCode: HttpStatus.BAD_REQUEST,
+            message: result.message,
+            error: result.error,
+          },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        {
+          statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+          message: 'An unexpected error occurred while updating avatar.',
+          error: error.message,
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
 }

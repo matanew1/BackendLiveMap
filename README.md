@@ -112,6 +112,7 @@ Once the application is running, visit:
 - `POST /auth/signout` - User logout
 - `POST /auth/refresh` - Refresh access token
 - `POST /auth/upload-avatar` - Upload user avatar
+- `PATCH /auth/avatar` - Update existing user avatar
 
 ### Locations
 - `GET /locations` - Get locations
