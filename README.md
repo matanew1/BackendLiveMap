@@ -177,6 +177,409 @@ Frontend can access avatars via:
 https://your-project.supabase.co/storage/v1/object/public/avatars/users/{userId}/avatar.jpg
 ```
 
+## Frontend Integration - Storage API
+
+This section provides comprehensive documentation for frontend developers to integrate with the avatar storage system.
+
+### Avatar URL Structure
+
+Avatars are publicly accessible via Supabase Storage URLs:
+```
+https://your-project.supabase.co/storage/v1/object/public/avatars/users/{userId}/avatar.jpg
+```
+
+**Parameters:**
+- `your-project`: Your Supabase project URL
+- `userId`: The user's unique identifier
+- `avatar.jpg`: Fixed filename for all user avatars
+
+### API Endpoints
+
+#### 1. Upload Avatar
+**Endpoint:** `POST /auth/upload-avatar`  
+**Authentication:** Required (Bearer token)  
+**Content-Type:** `multipart/form-data`
+
+**Request:**
+```javascript
+const formData = new FormData();
+formData.append('file', imageFile); // File object
+
+const response = await fetch('/auth/upload-avatar', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${userToken}`
+  },
+  body: formData
+});
+```
+
+**Response:**
+```json
+{
+  "statusCode": 201,
+  "message": "Avatar uploaded successfully.",
+  "data": {
+    "avatarUrl": "https://your-project.supabase.co/storage/v1/object/public/avatars/users/user123/avatar.jpg"
+  }
+}
+```
+
+#### 2. Update Avatar
+**Endpoint:** `PATCH /auth/avatar`  
+**Authentication:** Required (Bearer token)  
+**Content-Type:** `multipart/form-data`
+
+**Request:**
+```javascript
+const formData = new FormData();
+formData.append('file', newImageFile);
+
+const response = await fetch('/auth/avatar', {
+  method: 'PATCH',
+  headers: {
+    'Authorization': `Bearer ${userToken}`
+  },
+  body: formData
+});
+```
+
+**Response:**
+```json
+{
+  "statusCode": 200,
+  "message": "Avatar updated successfully.",
+  "data": {
+    "avatarUrl": "https://your-project.supabase.co/storage/v1/object/public/avatars/users/user123/avatar.jpg",
+    "previousAvatarUrl": "https://your-project.supabase.co/storage/v1/object/public/avatars/users/user123/old-avatar.jpg"
+  }
+}
+```
+
+#### 3. Delete Avatar
+**Endpoint:** `DELETE /auth/avatar`  
+**Authentication:** Required (Bearer token)
+
+**Request:**
+```javascript
+const response = await fetch('/auth/avatar', {
+  method: 'DELETE',
+  headers: {
+    'Authorization': `Bearer ${userToken}`
+  }
+});
+```
+
+**Response:**
+```json
+{
+  "statusCode": 200,
+  "message": "Avatar deleted successfully.",
+  "data": {
+    "previousAvatarUrl": "https://your-project.supabase.co/storage/v1/object/public/avatars/users/user123/avatar.jpg"
+  }
+}
+```
+
+### Frontend Examples
+
+#### React/Next.js Example
+```javascript
+import { useState } from 'react';
+
+function AvatarManager({ userId, token }) {
+  const [avatarUrl, setAvatarUrl] = useState(null);
+  const [uploading, setUploading] = useState(false);
+
+  // Upload avatar
+  const uploadAvatar = async (file) => {
+    setUploading(true);
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await fetch('/auth/upload-avatar', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      const result = await response.json();
+      if (result.statusCode === 201) {
+        setAvatarUrl(result.data.avatarUrl);
+      }
+    } catch (error) {
+      console.error('Upload failed:', error);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // Update avatar
+  const updateAvatar = async (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await fetch('/auth/avatar', {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      const result = await response.json();
+      if (result.statusCode === 200) {
+        setAvatarUrl(result.data.avatarUrl);
+      }
+    } catch (error) {
+      console.error('Update failed:', error);
+    }
+  };
+
+  // Delete avatar
+  const deleteAvatar = async () => {
+    try {
+      const response = await fetch('/auth/avatar', {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      const result = await response.json();
+      if (result.statusCode === 200) {
+        setAvatarUrl(null);
+      }
+    } catch (error) {
+      console.error('Delete failed:', error);
+    }
+  };
+
+  // Get avatar URL for display
+  const getAvatarUrl = (userId) => {
+    return `https://your-project.supabase.co/storage/v1/object/public/avatars/users/${userId}/avatar.jpg`;
+  };
+
+  return (
+    <div>
+      {avatarUrl && (
+        <img src={avatarUrl} alt="Avatar" width="100" height="100" />
+      )}
+
+      <input
+        type="file"
+        accept="image/*"
+        onChange={(e) => e.target.files[0] && uploadAvatar(e.target.files[0])}
+        disabled={uploading}
+      />
+
+      <button onClick={() => updateAvatar(someFile)}>Update Avatar</button>
+      <button onClick={deleteAvatar}>Delete Avatar</button>
+    </div>
+  );
+}
+```
+
+#### Vue.js Example
+```javascript
+<template>
+  <div>
+    <img v-if="avatarUrl" :src="avatarUrl" alt="Avatar" />
+    <input type="file" @change="handleFileUpload" accept="image/*" />
+    <button @click="deleteAvatar">Delete Avatar</button>
+  </div>
+</template>
+
+<script>
+export default {
+  data() {
+    return {
+      avatarUrl: null,
+      userToken: localStorage.getItem('authToken')
+    }
+  },
+  methods: {
+    async handleFileUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      try {
+        const response = await fetch('/auth/upload-avatar', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${this.userToken}`
+          },
+          body: formData
+        });
+
+        const result = await response.json();
+        if (result.statusCode === 201) {
+          this.avatarUrl = result.data.avatarUrl;
+        }
+      } catch (error) {
+        console.error('Upload failed:', error);
+      }
+    },
+
+    async deleteAvatar() {
+      try {
+        const response = await fetch('/auth/avatar', {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${this.userToken}`
+          }
+        });
+
+        const result = await response.json();
+        if (result.statusCode === 200) {
+          this.avatarUrl = null;
+        }
+      } catch (error) {
+        console.error('Delete failed:', error);
+      }
+    }
+  },
+
+  computed: {
+    avatarDisplayUrl() {
+      return `https://your-project.supabase.co/storage/v1/object/public/avatars/users/${this.userId}/avatar.jpg`;
+    }
+  }
+}
+</script>
+```
+
+#### Angular Example
+```typescript
+import { Component } from '@angular/core';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
+
+@Component({
+  selector: 'app-avatar',
+  template: `
+    <img *ngIf="avatarUrl" [src]="avatarUrl" alt="Avatar" />
+    <input type="file" (change)="onFileSelected($event)" accept="image/*" />
+    <button (click)="deleteAvatar()">Delete Avatar</button>
+  `
+})
+export class AvatarComponent {
+  avatarUrl: string | null = null;
+  selectedFile: File | null = null;
+
+  constructor(private http: HttpClient) {}
+
+  onFileSelected(event: any) {
+    this.selectedFile = event.target.files[0];
+    if (this.selectedFile) {
+      this.uploadAvatar();
+    }
+  }
+
+  uploadAvatar() {
+    if (!this.selectedFile) return;
+
+    const formData = new FormData();
+    formData.append('file', this.selectedFile);
+
+    const headers = new HttpHeaders({
+      'Authorization': `Bearer ${this.getToken()}`
+    });
+
+    this.http.post('/auth/upload-avatar', formData, { headers })
+      .subscribe({
+        next: (response: any) => {
+          if (response.statusCode === 201) {
+            this.avatarUrl = response.data.avatarUrl;
+          }
+        },
+        error: (error) => console.error('Upload failed:', error)
+      });
+  }
+
+  deleteAvatar() {
+    const headers = new HttpHeaders({
+      'Authorization': `Bearer ${this.getToken()}`
+    });
+
+    this.http.delete('/auth/avatar', { headers })
+      .subscribe({
+        next: (response: any) => {
+          if (response.statusCode === 200) {
+            this.avatarUrl = null;
+          }
+        },
+        error: (error) => console.error('Delete failed:', error)
+      });
+  }
+
+  getToken(): string {
+    return localStorage.getItem('authToken') || '';
+  }
+
+  getAvatarUrl(userId: string): string {
+    return `https://your-project.supabase.co/storage/v1/object/public/avatars/users/${userId}/avatar.jpg`;
+  }
+}
+```
+
+### Error Handling
+
+#### Common HTTP Status Codes
+
+| Status Code | Meaning | Action |
+|-------------|---------|--------|
+| `200` | Success | Operation completed |
+| `201` | Created | Avatar uploaded successfully |
+| `400` | Bad Request | Invalid file, user not found, or no avatar to delete |
+| `401` | Unauthorized | Invalid or missing authentication token |
+| `403` | Forbidden | Row Level Security policy violation |
+| `500` | Server Error | Internal server error |
+
+#### Error Response Format
+```json
+{
+  "statusCode": 400,
+  "message": "Error message description",
+  "error": "Detailed error information"
+}
+```
+
+### File Upload Guidelines
+
+- **Supported Formats:** JPEG, PNG, GIF, WebP
+- **Maximum Size:** 5MB (configurable in Supabase)
+- **Naming:** All avatars are automatically named `avatar.jpg`
+- **Storage:** Files are organized in user-specific folders
+- **Public Access:** All avatars are publicly accessible for display
+
+### Authentication
+
+All avatar management endpoints require authentication via Bearer token:
+
+```javascript
+headers: {
+  'Authorization': `Bearer ${jwtToken}`
+}
+```
+
+Tokens are obtained through the `/auth/signin` endpoint and should be stored securely (localStorage, secure cookies, etc.).
+
+### Best Practices
+
+1. **Image Optimization:** Compress images before upload to reduce bandwidth
+2. **Loading States:** Show loading indicators during upload operations
+3. **Error Handling:** Implement proper error handling for all API calls
+4. **Caching:** Cache avatar URLs to reduce API calls
+5. **Fallback Images:** Provide default avatars when users don't have custom ones
+6. **Security:** Never expose authentication tokens in client-side logs
+
 ## Testing
 
 ### Unit Tests
