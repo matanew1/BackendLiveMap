@@ -2,11 +2,17 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { LocationsService } from './locations/locations.service';
+import { Repository, DataSource } from 'typeorm';
+import { User } from './auth/user.entity';
 
 async function seed() {
   console.log('Starting seed...');
   const app = await NestFactory.createApplicationContext(AppModule);
   const service = app.get(LocationsService);
+
+  // Get DataSource and create user repository
+  const dataSource = app.get(DataSource);
+  const userRepository = dataSource.getRepository(User);
 
   // Get starting point coordinates from command line args or env vars
   const latArg = process.argv[2] || process.env.SEED_LAT || '32.0811944503777';
@@ -23,18 +29,98 @@ async function seed() {
   const myLocation = { lat: parseFloat(latArg), lng: parseFloat(lngArg) };
   const radiusMeters = 500;
 
-  // Generate test users within 500m radius
-  const testUsers = [
-    { userId: 'test-user-1', distance: 0, bearing: 0 }, // Exact location provided by user
-    { userId: 'test-user-2', distance: 50, bearing: 45 }, // 50m Northeast
-    { userId: 'test-user-3', distance: 100, bearing: 90 }, // 100m East
-    { userId: 'test-user-4', distance: 150, bearing: 135 }, // 150m Southeast
-    { userId: 'test-user-5', distance: 200, bearing: 180 }, // 200m South
-    { userId: 'test-user-6', distance: 250, bearing: 225 }, // 250m Southwest
-    { userId: 'test-user-7', distance: 300, bearing: 270 }, // 300m West
-    { userId: 'test-user-8', distance: 350, bearing: 315 }, // 350m Northwest
-    { userId: 'test-user-9', distance: 400, bearing: 0 }, // 400m North
-    { userId: 'test-user-10', distance: 450, bearing: 120 }, // 450m East-southeast
+  // Generate 10 realistic users with dog information
+  const realUsers = [
+    {
+      id: 'user-001',
+      email: 'sarah.johnson@example.com',
+      dogName: 'Max',
+      dogBreed: 'Golden Retriever',
+      dogAge: 3,
+      distance: 0,
+      bearing: 0,
+    },
+    {
+      id: 'user-002',
+      email: 'mike.chen@example.com',
+      dogName: 'Bella',
+      dogBreed: 'Labrador',
+      dogAge: 2,
+      distance: 50,
+      bearing: 45,
+    },
+    {
+      id: 'user-003',
+      email: 'emma.davis@example.com',
+      dogName: 'Charlie',
+      dogBreed: 'Beagle',
+      dogAge: 4,
+      distance: 100,
+      bearing: 90,
+    },
+    {
+      id: 'user-004',
+      email: 'alex.rodriguez@example.com',
+      dogName: 'Luna',
+      dogBreed: 'Border Collie',
+      dogAge: 1,
+      distance: 150,
+      bearing: 135,
+    },
+    {
+      id: 'user-005',
+      email: 'lisa.wilson@example.com',
+      dogName: 'Rocky',
+      dogBreed: 'German Shepherd',
+      dogAge: 5,
+      distance: 200,
+      bearing: 180,
+    },
+    {
+      id: 'user-006',
+      email: 'david.kim@example.com',
+      dogName: 'Daisy',
+      dogBreed: 'Poodle',
+      dogAge: 2,
+      distance: 250,
+      bearing: 225,
+    },
+    {
+      id: 'user-007',
+      email: 'anna.martinez@example.com',
+      dogName: 'Buddy',
+      dogBreed: 'Bulldog',
+      dogAge: 3,
+      distance: 300,
+      bearing: 270,
+    },
+    {
+      id: 'user-008',
+      email: 'james.taylor@example.com',
+      dogName: 'Sadie',
+      dogBreed: 'Boxer',
+      dogAge: 4,
+      distance: 350,
+      bearing: 315,
+    },
+    {
+      id: 'user-009',
+      email: 'olivia.brown@example.com',
+      dogName: 'Bailey',
+      dogBreed: 'Shih Tzu',
+      dogAge: 1,
+      distance: 400,
+      bearing: 0,
+    },
+    {
+      id: 'user-010',
+      email: 'ryan.garcia@example.com',
+      dogName: 'Molly',
+      dogBreed: 'Chihuahua',
+      dogAge: 6,
+      distance: 450,
+      bearing: 120,
+    },
   ];
 
   // Function to calculate new coordinates from distance and bearing
@@ -69,12 +155,12 @@ async function seed() {
     };
   }
 
-  for (const user of testUsers) {
+  for (const userData of realUsers) {
     try {
       let coords;
 
-      if (user.distance === 0) {
-        // Use exact coordinates for test-user-1
+      if (userData.distance === 0) {
+        // Use exact coordinates for the first user
         coords = {
           lat: myLocation.lat,
           lng: myLocation.lng,
@@ -84,28 +170,44 @@ async function seed() {
         coords = calculateDestination(
           myLocation.lat,
           myLocation.lng,
-          user.distance,
-          user.bearing,
+          userData.distance,
+          userData.bearing,
         );
       }
 
-      await service.saveLocation(user.userId, coords.lat, coords.lng);
+      // Create user record
+      const user = new User();
+      user.id = userData.id;
+      user.email = userData.email;
+      user.dogName = userData.dogName;
+      user.dogBreed = userData.dogBreed;
+      user.dogAge = userData.dogAge;
+
+      // Save user to database
+      await userRepository.save(user);
       console.log(
-        `Inserted ${user.userId}: ${user.distance}m away at bearing ${user.bearing}° -`,
+        `Created user: ${userData.dogName} (${userData.dogBreed}) - ${userData.email}`,
+      );
+
+      // Save user location
+      await service.saveLocation(userData.id, coords.lat, coords.lng);
+      console.log(
+        `  Location: ${userData.distance}m away at bearing ${userData.bearing}° -`,
         {
           lat: coords.lat.toFixed(6),
           lng: coords.lng.toFixed(6),
         },
       );
     } catch (error) {
-      console.error(`Error inserting ${user.userId}:`, error);
+      console.error(`Error creating user ${userData.id}:`, error);
     }
   }
 
   console.log(
-    `\nSeeded ${testUsers.length} test users within ${radiusMeters}m radius of:`,
+    `\nSeeded ${realUsers.length} real users with dogs within ${radiusMeters}m radius of:`,
     myLocation,
   );
+  console.log('Users created with realistic dog information and locations!');
   await app.close();
 }
 
