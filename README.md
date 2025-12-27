@@ -113,6 +113,7 @@ Once the application is running, visit:
 - `POST /auth/refresh` - Refresh access token
 - `POST /auth/upload-avatar` - Upload user avatar
 - `PATCH /auth/avatar` - Update existing user avatar
+- `DELETE /auth/avatar` - Delete user avatar
 
 ### Locations
 - `GET /locations` - Get locations
@@ -129,19 +130,37 @@ Once the application is running, visit:
 2. Make it public
 3. Add RLS policies:
 
-**Insert Policy** (for uploads):
+**Public Read Access** (for viewing avatars):
 ```sql
-CREATE POLICY "Allow authenticated users to upload" ON storage.objects
+CREATE POLICY "Public read access for avatars" ON storage.objects
+FOR SELECT USING (bucket_id = 'avatars');
+```
+
+**Authenticated Upload** (for uploading avatars):
+```sql
+CREATE POLICY "Allow authenticated users to upload avatars" ON storage.objects
 FOR INSERT WITH CHECK (
-  bucket_id = 'avatars' AND
-  auth.role() = 'authenticated'
+  bucket_id = 'avatars' 
+  AND auth.role() = 'authenticated'
 );
 ```
 
-**Select Policy** (for viewing):
+**Update Own Avatar** (for updating existing avatars):
 ```sql
-CREATE POLICY "Allow public access to view" ON storage.objects
-FOR SELECT USING (bucket_id = 'avatars');
+CREATE POLICY "Allow users to update their own avatars" ON storage.objects
+FOR UPDATE USING (
+  bucket_id = 'avatars' 
+  AND auth.uid()::text = (storage.foldername(name))[1]
+);
+```
+
+**Delete Own Avatar** (for deleting avatars):
+```sql
+CREATE POLICY "Allow users to delete their own avatars" ON storage.objects
+FOR DELETE USING (
+  bucket_id = 'avatars' 
+  AND auth.uid()::text = (storage.foldername(name))[1]
+);
 ```
 
 ### Avatar Storage Structure

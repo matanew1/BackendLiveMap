@@ -370,4 +370,67 @@ export class AuthService {
       };
     }
   }
+
+  async deleteAvatar(userId: string, token?: string): Promise<ApiResponse> {
+    try {
+      // Check if user exists and has an avatar
+      const user = await this.userRepo.findOne({ where: { id: userId } });
+      if (!user) {
+        return ApiResponse.error('User not found.');
+      }
+
+      if (!user.avatarUrl) {
+        return ApiResponse.error('User has no avatar to delete.');
+      }
+
+      const fileName = `users/${userId}/avatar.jpg`; // Same path structure
+
+      // Create authenticated client if token provided
+      const client = token
+        ? createClient(
+            this.configService.get<string>('supabase.url')!,
+            this.configService.get<string>('supabase.anonKey')!,
+            {
+              global: {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                },
+              },
+            },
+          )
+        : this.supabase;
+
+      console.log('Deleting avatar for user:', userId);
+
+      // Delete the file from storage
+      const { error } = await client.storage.from('avatars').remove([fileName]);
+
+      if (error) {
+        console.error('Supabase storage delete error:', error);
+        return {
+          success: false,
+          message: `Error deleting avatar: ${error.message}`,
+          error: error.message,
+        };
+      }
+
+      // Clear avatarUrl in database
+      await this.userRepo.update(userId, { avatarUrl: null });
+
+      return {
+        success: true,
+        message: 'Avatar deleted successfully.',
+        data: {
+          previousAvatarUrl: user.avatarUrl,
+        },
+      };
+    } catch (error) {
+      console.error('Unexpected error in deleteAvatar:', error);
+      return {
+        success: false,
+        message: 'Error deleting avatar.',
+        error: error.message,
+      };
+    }
+  }
 }

@@ -32,7 +32,7 @@ export class User {
   dogAge: number;
 
   @Column({ nullable: true })
-  avatarUrl: string;
+  avatarUrl: string | null;
 
   @CreateDateColumn()
   created_at: Date;

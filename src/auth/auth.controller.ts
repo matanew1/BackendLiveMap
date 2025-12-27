@@ -12,6 +12,7 @@ import {
   Req,
   UseInterceptors,
   UploadedFile,
+  Delete,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -500,7 +501,8 @@ export class AuthController {
   @Patch('avatar')
   @ApiOperation({
     summary: 'Update user avatar',
-    description: 'Update the existing avatar image for the authenticated user. This will replace the current avatar with a new image.'
+    description:
+      'Update the existing avatar image for the authenticated user. This will replace the current avatar with a new image.',
   })
   @ApiResponse({
     status: 200,
@@ -515,20 +517,28 @@ export class AuthController {
           properties: {
             avatarUrl: {
               type: 'string',
-              example: 'https://your-project.supabase.co/storage/v1/object/public/avatars/users/user123/avatar.jpg'
+              example:
+                'https://your-project.supabase.co/storage/v1/object/public/avatars/users/user123/avatar.jpg',
             },
             previousAvatarUrl: {
               type: 'string',
               nullable: true,
-              example: 'https://your-project.supabase.co/storage/v1/object/public/avatars/users/user123/avatar.jpg'
-            }
-          }
-        }
-      }
-    }
+              example:
+                'https://your-project.supabase.co/storage/v1/object/public/avatars/users/user123/avatar.jpg',
+            },
+          },
+        },
+      },
+    },
   })
-  @ApiResponse({ status: 400, description: 'Bad request - invalid file or storage error' })
-  @ApiResponse({ status: 401, description: 'Unauthorized - invalid or missing JWT token' })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request - invalid file or storage error',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - invalid or missing JWT token',
+  })
   @ApiResponse({ status: 404, description: 'User not found' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -539,10 +549,10 @@ export class AuthController {
         file: {
           type: 'string',
           format: 'binary',
-          description: 'New image file to replace current avatar'
+          description: 'New image file to replace current avatar',
         },
       },
-      required: ['file']
+      required: ['file'],
     },
   })
   @ApiBearerAuth('JWT-auth')
@@ -585,6 +595,77 @@ export class AuthController {
         {
           statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
           message: 'An unexpected error occurred while updating avatar.',
+          error: error.message,
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Delete('avatar')
+  @UseGuards(SupabaseAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Delete user avatar',
+    description:
+      "Deletes the authenticated user's avatar from storage and database",
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Avatar deleted successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        statusCode: { type: 'number', example: 200 },
+        message: { type: 'string', example: 'Avatar deleted successfully.' },
+        data: {
+          type: 'object',
+          properties: {
+            previousAvatarUrl: { type: 'string', example: 'https://...' },
+          },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request - User not found or no avatar to delete',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 500, description: 'Internal server error' })
+  async deleteAvatar(@Req() request: Request) {
+    try {
+      const authHeader = request.headers.authorization;
+      const token = authHeader?.replace('Bearer ', '');
+      const result = await this.authService.deleteAvatar(
+        request.user.id,
+        token,
+      );
+
+      if (result.success) {
+        return {
+          statusCode: HttpStatus.OK,
+          message: result.message,
+          data: result.data,
+        };
+      } else {
+        throw new HttpException(
+          {
+            statusCode: HttpStatus.BAD_REQUEST,
+            message: result.message,
+            error: result.error,
+          },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        {
+          statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+          message: 'An unexpected error occurred while deleting avatar.',
           error: error.message,
         },
         HttpStatus.INTERNAL_SERVER_ERROR,
