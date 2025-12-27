@@ -16,10 +16,12 @@ export class AuthService {
     private configService: ConfigService,
   ) {
     const supabaseUrl = this.configService.get<string>('supabase.url');
-    const supabaseKey = this.configService.get<string>('supabase.anonKey');
+    const supabaseKey = this.configService.get<string>(
+      'supabase.serviceRoleKey',
+    );
 
     if (!supabaseUrl || !supabaseKey) {
-      throw new Error('Supabase URL and anon key must be provided');
+      throw new Error('Supabase URL and service role key must be provided');
     }
 
     this.supabase = createClient(supabaseUrl, supabaseKey);
@@ -225,7 +227,19 @@ export class AuthService {
     token?: string,
   ): Promise<ApiResponse> {
     try {
-      const fileName = `users/${userId}/avatar.jpg`; // Organize by user folders
+      // Check if user already has an avatar
+      const user = await this.userRepo.findOne({ where: { id: userId } });
+      if (!user) {
+        return ApiResponse.error('User not found.');
+      }
+
+      if (user.avatarUrl) {
+        return ApiResponse.error(
+          'User already has an avatar. Use the update endpoint (PATCH /auth/avatar) to replace it.',
+        );
+      }
+
+      const fileName = `users/${userId}/avatar_${Date.now()}.jpg`; // Unique filename to avoid caching
 
       // Create authenticated client if token provided
       const client = token
@@ -248,7 +262,7 @@ export class AuthService {
         .from('avatars') // assuming bucket name is 'avatars'
         .upload(fileName, file.buffer, {
           contentType: file.mimetype,
-          upsert: true, // Allow overwriting existing avatar
+          upsert: false, // Use unique filename, no upsert needed
         });
 
       if (error) {
@@ -278,13 +292,16 @@ export class AuthService {
         .from('avatars')
         .getPublicUrl(fileName);
 
+      // Add timestamp to bust cache
+      const cacheBustedUrl = `${publicUrl.publicUrl}?t=${Date.now()}`;
+
       // Update user avatarUrl
-      await this.userRepo.update(userId, { avatarUrl: publicUrl.publicUrl });
+      await this.userRepo.update(userId, { avatarUrl: cacheBustedUrl });
 
       return {
         success: true,
         message: 'Avatar uploaded successfully.',
-        data: { avatarUrl: publicUrl.publicUrl },
+        data: { avatarUrl: cacheBustedUrl },
       };
     } catch (error) {
       console.error('Unexpected error in uploadAvatar:', error);
@@ -308,7 +325,17 @@ export class AuthService {
         return ApiResponse.error('User not found.');
       }
 
-      const fileName = `users/${userId}/avatar.jpg`; // Same path as upload
+      const fileName = `users/${userId}/avatar_${Date.now()}.jpg`; // Unique filename to avoid caching
+
+      console.log('UpdateAvatar - User found:', userId);
+      console.log('UpdateAvatar - Current avatarUrl:', user.avatarUrl);
+      console.log('UpdateAvatar - New fileName:', fileName);
+      console.log('UpdateAvatar - File details:', {
+        originalname: file.originalname,
+        mimetype: file.mimetype,
+        size: file.size,
+        bufferLength: file.buffer?.length,
+      });
 
       // Create authenticated client if token provided
       const client = token
@@ -325,14 +352,18 @@ export class AuthService {
           )
         : this.supabase;
 
+      console.log(
+        'UpdateAvatar - Using client type:',
+        token ? 'authenticated' : 'service_role',
+      );
       console.log('Updating existing avatar for user:', userId);
 
-      // Upload new avatar (will overwrite existing)
+      // Upload new avatar with unique filename
       const { data, error } = await client.storage
         .from('avatars')
         .upload(fileName, file.buffer, {
           contentType: file.mimetype,
-          upsert: true, // Always overwrite existing avatar
+          upsert: false, // Don't upsert since we're using unique names
         });
 
       if (error) {
@@ -344,20 +375,63 @@ export class AuthService {
         };
       }
 
+      console.log('UpdateAvatar - Upload successful, data:', data);
+
+      // If there was a previous avatar, try to clean it up
+      if (user.avatarUrl) {
+        try {
+          // Extract the path from the previous URL
+          const urlParts = user.avatarUrl.split(
+            '/storage/v1/object/public/avatars/',
+          )[1];
+          const oldFileName = urlParts?.split('?')[0]; // Remove query params
+          if (oldFileName && oldFileName !== fileName) {
+            console.log(
+              'UpdateAvatar - Attempting to clean up old file:',
+              oldFileName,
+            );
+            const { error: cleanupError } = await client.storage
+              .from('avatars')
+              .remove([oldFileName]);
+            if (cleanupError) {
+              console.log(
+                'UpdateAvatar - Cleanup warning (non-critical):',
+                cleanupError.message,
+              );
+            } else {
+              console.log('UpdateAvatar - Old file cleaned up successfully');
+            }
+          }
+        } catch (cleanupError) {
+          console.log(
+            'UpdateAvatar - Cleanup failed (non-critical):',
+            cleanupError,
+          );
+        }
+      }
       console.log('Avatar updated successfully, getting public URL...');
 
       const { data: publicUrl } = client.storage
         .from('avatars')
         .getPublicUrl(fileName);
 
+      console.log('UpdateAvatar - Public URL:', publicUrl.publicUrl);
+
+      // Add timestamp to bust cache
+      const cacheBustedUrl = `${publicUrl.publicUrl}?t=${Date.now()}`;
+
+      console.log('UpdateAvatar - Cache busted URL:', cacheBustedUrl);
+
       // Update user avatarUrl in database
-      await this.userRepo.update(userId, { avatarUrl: publicUrl.publicUrl });
+      await this.userRepo.update(userId, { avatarUrl: cacheBustedUrl });
+
+      console.log('UpdateAvatar - Database updated successfully');
 
       return {
         success: true,
         message: 'Avatar updated successfully.',
         data: {
-          avatarUrl: publicUrl.publicUrl,
+          avatarUrl: cacheBustedUrl,
           previousAvatarUrl: user.avatarUrl,
         },
       };
@@ -383,7 +457,21 @@ export class AuthService {
         return ApiResponse.error('User has no avatar to delete.');
       }
 
-      const fileName = `users/${userId}/avatar.jpg`; // Same path structure
+      // Extract the actual filename from the avatar URL
+      const urlParts = user.avatarUrl.split(
+        '/storage/v1/object/public/avatars/',
+      )[1];
+      const fileName = urlParts?.split('?')[0]; // Remove query params like ?t=timestamp
+
+      if (!fileName) {
+        console.error(
+          'Could not extract filename from avatar URL:',
+          user.avatarUrl,
+        );
+        return ApiResponse.error('Invalid avatar URL format.');
+      }
+
+      console.log('DeleteAvatar - Extracted filename:', fileName);
 
       // Create authenticated client if token provided
       const client = token
@@ -401,6 +489,7 @@ export class AuthService {
         : this.supabase;
 
       console.log('Deleting avatar for user:', userId);
+      console.log('DeleteAvatar - Avatar URL:', user.avatarUrl);
 
       // Delete the file from storage
       const { error } = await client.storage.from('avatars').remove([fileName]);
@@ -414,8 +503,12 @@ export class AuthService {
         };
       }
 
+      console.log('DeleteAvatar - File deleted successfully from storage');
+
       // Clear avatarUrl in database
       await this.userRepo.update(userId, { avatarUrl: null as any });
+
+      console.log('DeleteAvatar - Database updated successfully');
 
       return {
         success: true,

@@ -23,6 +23,9 @@ export class SupabaseConfig {
 
   @IsString()
   SUPABASE_ANON_KEY: string;
+
+  @IsString()
+  SUPABASE_SERVICE_ROLE_KEY: string;
 }
 
 export class RedisConfig {
@@ -58,6 +61,7 @@ export const databaseConfig = registerAs('database', () => ({
 export const supabaseConfig = registerAs('supabase', () => ({
   url: process.env.SUPABASE_URL,
   anonKey: process.env.SUPABASE_ANON_KEY,
+  serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
 }));
 
 export const redisConfig = registerAs('redis', () => ({

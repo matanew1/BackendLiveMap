@@ -36,6 +36,7 @@ export class ConfigValidationService {
     const supabaseConfig = plainToClass(SupabaseConfig, {
       SUPABASE_URL: this.rawConfig?.SUPABASE_URL,
       SUPABASE_ANON_KEY: this.rawConfig?.SUPABASE_ANON_KEY,
+      SUPABASE_SERVICE_ROLE_KEY: this.rawConfig?.SUPABASE_SERVICE_ROLE_KEY,
     });
     const supabaseErrors = validateSync(supabaseConfig);
     if (supabaseErrors.length > 0) {

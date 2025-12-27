@@ -604,7 +604,7 @@ export class AuthController {
 
   @Delete('avatar')
   @UseGuards(SupabaseAuthGuard)
-  @ApiBearerAuth()
+  @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Delete user avatar',
     description:
