@@ -31,9 +31,10 @@ export class LocationsService {
     );
 
     // Also update the user's lastLocation
-    await this.userRepo.update(userId, {
-      lastLocation: `SRID=4326;POINT(${lng} ${lat})`,
-    });
+    await this.userRepo.query(
+      `UPDATE users SET "lastLocation" = ST_SetSRID(ST_MakePoint($1, $2), 4326) WHERE id = $3`,
+      [lng, lat, userId],
+    );
 
     return result;
   }
