@@ -415,7 +415,7 @@ export class AuthService {
       }
 
       // Clear avatarUrl in database
-      await this.userRepo.update(userId, { avatarUrl: null });
+      await this.userRepo.update(userId, { avatarUrl: null as any });
 
       return {
         success: true,

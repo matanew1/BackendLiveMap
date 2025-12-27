@@ -273,286 +273,288 @@ describe('AuthService', () => {
       const result = await service.uploadAvatar('user123', mockFile);
 
       expect(result.success).toBe(false);
-      expect(result.message).toBe('Error uploading avatar: Upload failed: File too large');
-      expect(result.error).toBe('Upload failed: File too large');
-    });
-
-      // Mock upload error
-      const mockStorageFrom = {
-        upload: jest.fn().mockResolvedValue({
-          data: null,
-          error: { message: 'Upload failed: File too large' },
-        }),
-        getPublicUrl: jest.fn(),
-      };
-      service['supabase'].storage.from.mockReturnValue(mockStorageFrom);
-
-      const result = await service.uploadAvatar('user123', mockFile);
-
-      expect(result.success).toBe(false);
       expect(result.message).toBe(
         'Error uploading avatar: Upload failed: File too large',
       );
       expect(result.error).toBe('Upload failed: File too large');
     });
 
-    it('should handle unexpected errors', async () => {
-      // Mock upload throws error
-      const mockStorageFrom = {
-        upload: jest.fn().mockRejectedValue(new Error('Network error')),
-        getPublicUrl: jest.fn(),
-      };
-      service['supabase'].storage.from.mockReturnValue(mockStorageFrom);
-
-      const result = await service.uploadAvatar('user123', mockFile);
-
-      expect(result.success).toBe(false);
-      expect(result.message).toBe('Error uploading avatar.');
-      expect(result.error).toBe('Network error');
-    });
-
-    it('should use authenticated client when token is provided', async () => {
-      // Mock successful upload
-      const mockStorageFrom = service['supabase'].storage.from('avatars');
-      mockStorageFrom.upload.mockResolvedValue({
-        data: { path: 'user123-1234567890.jpg' },
-        error: null,
-      });
-      mockStorageFrom.getPublicUrl.mockReturnValue({
-        data: {
-          publicUrl: 'https://supabase-url/avatars/user123-1234567890.jpg',
-        },
-      });
-
-      // Mock user update
-      jest.spyOn(service['userRepo'], 'update').mockResolvedValue({} as any);
-
-      await service.uploadAvatar('user123', mockFile, 'jwt-token');
-    });
-  });
-
-  describe('updateAvatar', () => {
-    const mockFile = {
-      buffer: Buffer.from('fake image data'),
-      mimetype: 'image/jpeg',
-      originalname: 'avatar.jpg',
-    } as Express.Multer.File;
-
-    it('should update avatar successfully', async () => {
-      // Mock user lookup
-      const mockUser = { id: 'user123', avatarUrl: 'old-avatar-url' };
-      jest
-        .spyOn(service['userRepo'], 'findOne')
-        .mockResolvedValue(mockUser as any);
-
-      // Mock Supabase storage
-      const mockUpload = jest.fn().mockResolvedValue({ data: {}, error: null });
-      const mockGetPublicUrl = jest
-        .fn()
-        .mockReturnValue({ data: { publicUrl: 'new-avatar-url' } });
-
-      service['supabase'].storage.from.mockReturnValue({
-        upload: mockUpload,
-        getPublicUrl: mockGetPublicUrl,
-      });
-
-      // Mock user update
-      jest.spyOn(service['userRepo'], 'update').mockResolvedValue({} as any);
-
-      const result = await service.updateAvatar('user123', mockFile);
-
-      expect(result.success).toBe(true);
-      expect(result.message).toBe('Avatar updated successfully.');
-      expect(result.data.avatarUrl).toBe('new-avatar-url');
-      expect(result.data.previousAvatarUrl).toBe('old-avatar-url');
-      expect(mockUpload).toHaveBeenCalledWith(
-        'users/user123/avatar.jpg',
-        mockFile.buffer,
-        {
-          contentType: 'image/jpeg',
-          upsert: true,
-        },
-      );
-    });
-
-    it('should return error if user not found', async () => {
-      jest.spyOn(service['userRepo'], 'findOne').mockResolvedValue(null);
-
-      const result = await service.updateAvatar('user123', mockFile);
-
-      expect(result.success).toBe(false);
-      expect(result.message).toBe('User not found.');
-    });
-
-    it('should handle storage upload error', async () => {
-      // Mock user lookup
-      const mockUser = { id: 'user123', avatarUrl: null };
-      jest
-        .spyOn(service['userRepo'], 'findOne')
-        .mockResolvedValue(mockUser as any);
-
-      // Mock Supabase storage error
-      const mockUpload = jest.fn().mockResolvedValue({
+    // Mock upload error
+    const mockStorageFrom = {
+      upload: jest.fn().mockResolvedValue({
         data: null,
-        error: { message: 'Storage error' },
-      });
+        error: { message: 'Upload failed: File too large' },
+      }),
+      getPublicUrl: jest.fn(),
+    };
+    service['supabase'].storage.from.mockReturnValue(mockStorageFrom);
 
-      service['supabase'].storage.from.mockReturnValue({
-        upload: mockUpload,
-      });
+    const result = await service.uploadAvatar('user123', mockFile);
 
-      const result = await service.updateAvatar('user123', mockFile);
+    expect(result.success).toBe(false);
+    expect(result.message).toBe(
+      'Error uploading avatar: Upload failed: File too large',
+    );
+    expect(result.error).toBe('Upload failed: File too large');
+  });
 
-      expect(result.success).toBe(false);
-      expect(result.message).toBe('Error updating avatar: Storage error');
+  it('should handle unexpected errors', async () => {
+    // Mock upload throws error
+    const mockStorageFrom = {
+      upload: jest.fn().mockRejectedValue(new Error('Network error')),
+      getPublicUrl: jest.fn(),
+    };
+    service['supabase'].storage.from.mockReturnValue(mockStorageFrom);
+
+    const result = await service.uploadAvatar('user123', mockFile);
+
+    expect(result.success).toBe(false);
+    expect(result.message).toBe('Error uploading avatar.');
+    expect(result.error).toBe('Network error');
+  });
+
+  it('should use authenticated client when token is provided', async () => {
+    // Mock successful upload
+    const mockStorageFrom = service['supabase'].storage.from('avatars');
+    mockStorageFrom.upload.mockResolvedValue({
+      data: { path: 'user123-1234567890.jpg' },
+      error: null,
+    });
+    mockStorageFrom.getPublicUrl.mockReturnValue({
+      data: {
+        publicUrl: 'https://supabase-url/avatars/user123-1234567890.jpg',
+      },
     });
 
-    it('should use authenticated client when token provided', async () => {
-      // Mock user lookup
-      const mockUser = { id: 'user123', avatarUrl: null };
-      jest
-        .spyOn(service['userRepo'], 'findOne')
-        .mockResolvedValue(mockUser as any);
+    // Mock user update
+    jest.spyOn(service['userRepo'], 'update').mockResolvedValue({} as any);
 
-      // Mock Supabase storage
-      const mockUpload = jest.fn().mockResolvedValue({ data: {}, error: null });
-      const mockGetPublicUrl = jest
-        .fn()
-        .mockReturnValue({ data: { publicUrl: 'new-avatar-url' } });
+    await service.uploadAvatar('user123', mockFile, 'jwt-token');
+  });
+});
 
-      service['supabase'].storage.from.mockReturnValue({
-        upload: mockUpload,
-        getPublicUrl: mockGetPublicUrl,
-      });
+describe('updateAvatar', () => {
+  const mockFile = {
+    buffer: Buffer.from('fake image data'),
+    mimetype: 'image/jpeg',
+    originalname: 'avatar.jpg',
+  } as Express.Multer.File;
 
-      // Mock user update
-      jest.spyOn(service['userRepo'], 'update').mockResolvedValue({} as any);
+  it('should update avatar successfully', async () => {
+    // Mock user lookup
+    const mockUser = { id: 'user123', avatarUrl: 'old-avatar-url' };
+    jest
+      .spyOn(service['userRepo'], 'findOne')
+      .mockResolvedValue(mockUser as any);
 
-      await service.updateAvatar('user123', mockFile, 'jwt-token');
+    // Mock Supabase storage
+    const mockUpload = jest.fn().mockResolvedValue({ data: {}, error: null });
+    const mockGetPublicUrl = jest
+      .fn()
+      .mockReturnValue({ data: { publicUrl: 'new-avatar-url' } });
 
-      // Verify createClient was called with token
-      expect(createClient).toHaveBeenCalledWith('mock-url', 'mock-key', {
-        global: {
-          headers: {
-            Authorization: `Bearer jwt-token`,
-          },
+    service['supabase'].storage.from.mockReturnValue({
+      upload: mockUpload,
+      getPublicUrl: mockGetPublicUrl,
+    });
+
+    // Mock user update
+    jest.spyOn(service['userRepo'], 'update').mockResolvedValue({} as any);
+
+    const result = await service.updateAvatar('user123', mockFile);
+
+    expect(result.success).toBe(true);
+    expect(result.message).toBe('Avatar updated successfully.');
+    expect(result.data.avatarUrl).toBe('new-avatar-url');
+    expect(result.data.previousAvatarUrl).toBe('old-avatar-url');
+    expect(mockUpload).toHaveBeenCalledWith(
+      'users/user123/avatar.jpg',
+      mockFile.buffer,
+      {
+        contentType: 'image/jpeg',
+        upsert: true,
+      },
+    );
+  });
+
+  it('should return error if user not found', async () => {
+    jest.spyOn(service['userRepo'], 'findOne').mockResolvedValue(null);
+
+    const result = await service.updateAvatar('user123', mockFile);
+
+    expect(result.success).toBe(false);
+    expect(result.message).toBe('User not found.');
+  });
+
+  it('should handle storage upload error', async () => {
+    // Mock user lookup
+    const mockUser = { id: 'user123', avatarUrl: null };
+    jest
+      .spyOn(service['userRepo'], 'findOne')
+      .mockResolvedValue(mockUser as any);
+
+    // Mock Supabase storage error
+    const mockUpload = jest.fn().mockResolvedValue({
+      data: null,
+      error: { message: 'Storage error' },
+    });
+
+    service['supabase'].storage.from.mockReturnValue({
+      upload: mockUpload,
+    });
+
+    const result = await service.updateAvatar('user123', mockFile);
+
+    expect(result.success).toBe(false);
+    expect(result.message).toBe('Error updating avatar: Storage error');
+  });
+
+  it('should use authenticated client when token provided', async () => {
+    // Mock user lookup
+    const mockUser = { id: 'user123', avatarUrl: null };
+    jest
+      .spyOn(service['userRepo'], 'findOne')
+      .mockResolvedValue(mockUser as any);
+
+    // Mock Supabase storage
+    const mockUpload = jest.fn().mockResolvedValue({ data: {}, error: null });
+    const mockGetPublicUrl = jest
+      .fn()
+      .mockReturnValue({ data: { publicUrl: 'new-avatar-url' } });
+
+    service['supabase'].storage.from.mockReturnValue({
+      upload: mockUpload,
+      getPublicUrl: mockGetPublicUrl,
+    });
+
+    // Mock user update
+    jest.spyOn(service['userRepo'], 'update').mockResolvedValue({} as any);
+
+    await service.updateAvatar('user123', mockFile, 'jwt-token');
+
+    // Verify createClient was called with token
+    expect(createClient).toHaveBeenCalledWith('mock-url', 'mock-key', {
+      global: {
+        headers: {
+          Authorization: `Bearer jwt-token`,
         },
+      },
+    });
+  });
+});
+
+describe('deleteAvatar', () => {
+  const mockFile = {
+    buffer: Buffer.from('test'),
+    mimetype: 'image/jpeg',
+  } as Express.Multer.File;
+
+  beforeEach(() => {
+    // Reset all mocks
+    jest.clearAllMocks();
+
+    // Mock config service
+    jest
+      .spyOn(service['configService'], 'get')
+      .mockImplementation((key: string) => {
+        if (key === 'supabase.url') return 'mock-url';
+        if (key === 'supabase.anonKey') return 'mock-key';
+        return undefined;
       });
+  });
+
+  it('should delete avatar successfully', async () => {
+    const mockUser = { id: 'user123', avatarUrl: 'old-avatar-url' };
+
+    // Mock user lookup
+    jest
+      .spyOn(service['userRepo'], 'findOne')
+      .mockResolvedValue(mockUser as any);
+
+    // Mock storage delete
+    const mockRemove = jest.fn().mockResolvedValue({ error: null });
+    service['supabase'].storage.from.mockReturnValue({
+      remove: mockRemove,
+    });
+
+    // Mock user update
+    jest.spyOn(service['userRepo'], 'update').mockResolvedValue({} as any);
+
+    const result = await service.deleteAvatar('user123');
+
+    expect(result.success).toBe(true);
+    expect(result.message).toBe('Avatar deleted successfully.');
+    expect(result.data).toEqual({ previousAvatarUrl: 'old-avatar-url' });
+    expect(mockRemove).toHaveBeenCalledWith(['users/user123/avatar.jpg']);
+    expect(service['userRepo'].update).toHaveBeenCalledWith('user123', {
+      avatarUrl: null,
     });
   });
 
-  describe('deleteAvatar', () => {
-    const mockFile = {
-      buffer: Buffer.from('test'),
-      mimetype: 'image/jpeg',
-    } as Express.Multer.File;
+  it('should return error if user not found', async () => {
+    jest.spyOn(service['userRepo'], 'findOne').mockResolvedValue(null);
 
-    beforeEach(() => {
-      // Reset all mocks
-      jest.clearAllMocks();
+    const result = await service.deleteAvatar('user123');
 
-      // Mock config service
-      jest
-        .spyOn(service['configService'], 'get')
-        .mockImplementation((key: string) => {
-          if (key === 'supabase.url') return 'mock-url';
-          if (key === 'supabase.anonKey') return 'mock-key';
-          return undefined;
-        });
+    expect(result.success).toBe(false);
+    expect(result.message).toBe('User not found.');
+  });
+
+  it('should return error if user has no avatar', async () => {
+    const mockUser = { id: 'user123', avatarUrl: null };
+    jest
+      .spyOn(service['userRepo'], 'findOne')
+      .mockResolvedValue(mockUser as any);
+
+    const result = await service.deleteAvatar('user123');
+
+    expect(result.success).toBe(false);
+    expect(result.message).toBe('User has no avatar to delete.');
+  });
+
+  it('should handle storage delete error', async () => {
+    const mockUser = { id: 'user123', avatarUrl: 'old-avatar-url' };
+    jest
+      .spyOn(service['userRepo'], 'findOne')
+      .mockResolvedValue(mockUser as any);
+
+    const mockRemove = jest
+      .fn()
+      .mockResolvedValue({ error: { message: 'Storage error' } });
+    service['supabase'].storage.from.mockReturnValue({
+      remove: mockRemove,
     });
 
-    it('should delete avatar successfully', async () => {
-      const mockUser = { id: 'user123', avatarUrl: 'old-avatar-url' };
+    const result = await service.deleteAvatar('user123');
 
-      // Mock user lookup
-      jest
-        .spyOn(service['userRepo'], 'findOne')
-        .mockResolvedValue(mockUser as any);
+    expect(result.success).toBe(false);
+    expect(result.message).toBe('Error deleting avatar: Storage error');
+  });
 
-      // Mock storage delete
-      const mockRemove = jest.fn().mockResolvedValue({ error: null });
-      service['supabase'].storage.from.mockReturnValue({
-        remove: mockRemove,
-      });
+  it('should use authenticated client when token provided', async () => {
+    const mockUser = { id: 'user123', avatarUrl: 'old-avatar-url' };
+    jest
+      .spyOn(service['userRepo'], 'findOne')
+      .mockResolvedValue(mockUser as any);
 
-      // Mock user update
-      jest.spyOn(service['userRepo'], 'update').mockResolvedValue({} as any);
+    const mockRemove = jest.fn().mockResolvedValue({ error: null });
+    const mockFrom = jest.fn().mockReturnValue({ remove: mockRemove });
 
-      const result = await service.deleteAvatar('user123');
-
-      expect(result.success).toBe(true);
-      expect(result.message).toBe('Avatar deleted successfully.');
-      expect(result.data).toEqual({ previousAvatarUrl: 'old-avatar-url' });
-      expect(mockRemove).toHaveBeenCalledWith(['users/user123/avatar.jpg']);
-      expect(service['userRepo'].update).toHaveBeenCalledWith('user123', {
-        avatarUrl: null,
-      });
+    (createClient as jest.Mock).mockReturnValue({
+      storage: { from: mockFrom },
     });
 
-    it('should return error if user not found', async () => {
-      jest.spyOn(service['userRepo'], 'findOne').mockResolvedValue(null);
+    jest.spyOn(service['userRepo'], 'update').mockResolvedValue({} as any);
 
-      const result = await service.deleteAvatar('user123');
+    await service.deleteAvatar('user123', 'jwt-token');
 
-      expect(result.success).toBe(false);
-      expect(result.message).toBe('User not found.');
-    });
-
-    it('should return error if user has no avatar', async () => {
-      const mockUser = { id: 'user123', avatarUrl: null };
-      jest
-        .spyOn(service['userRepo'], 'findOne')
-        .mockResolvedValue(mockUser as any);
-
-      const result = await service.deleteAvatar('user123');
-
-      expect(result.success).toBe(false);
-      expect(result.message).toBe('User has no avatar to delete.');
-    });
-
-    it('should handle storage delete error', async () => {
-      const mockUser = { id: 'user123', avatarUrl: 'old-avatar-url' };
-      jest
-        .spyOn(service['userRepo'], 'findOne')
-        .mockResolvedValue(mockUser as any);
-
-      const mockRemove = jest
-        .fn()
-        .mockResolvedValue({ error: { message: 'Storage error' } });
-      service['supabase'].storage.from.mockReturnValue({
-        remove: mockRemove,
-      });
-
-      const result = await service.deleteAvatar('user123');
-
-      expect(result.success).toBe(false);
-      expect(result.message).toBe('Error deleting avatar: Storage error');
-    });
-
-    it('should use authenticated client when token provided', async () => {
-      const mockUser = { id: 'user123', avatarUrl: 'old-avatar-url' };
-      jest
-        .spyOn(service['userRepo'], 'findOne')
-        .mockResolvedValue(mockUser as any);
-
-      const mockRemove = jest.fn().mockResolvedValue({ error: null });
-      const mockFrom = jest.fn().mockReturnValue({ remove: mockRemove });
-
-      (createClient as jest.Mock).mockReturnValue({
-        storage: { from: mockFrom },
-      });
-
-      jest.spyOn(service['userRepo'], 'update').mockResolvedValue({} as any);
-
-      await service.deleteAvatar('user123', 'jwt-token');
-
-      // Verify createClient was called with token
-      expect(createClient).toHaveBeenCalledWith('mock-url', 'mock-key', {
-        global: {
-          headers: {
-            Authorization: `Bearer jwt-token`,
-          },
+    // Verify createClient was called with token
+    expect(createClient).toHaveBeenCalledWith('mock-url', 'mock-key', {
+      global: {
+        headers: {
+          Authorization: `Bearer jwt-token`,
         },
-      });
+      },
     });
   });
+});
