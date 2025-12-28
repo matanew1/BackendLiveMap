@@ -8,6 +8,7 @@ import { LocationsModule } from './locations/locations.module';
 import { AuthModule } from './auth/auth.module';
 import { HealthModule } from './health/health.module';
 import { UploadModule } from './upload/upload.module';
+import { PostsModule } from './posts/posts.module';
 import {
   databaseConfig,
   supabaseConfig,
@@ -77,6 +78,7 @@ import { ConfigValidationService } from './config/config-validation.service';
     AuthModule,
     HealthModule,
     UploadModule,
+    PostsModule,
   ],
   providers: [
     {

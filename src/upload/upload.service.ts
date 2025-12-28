@@ -5,6 +5,7 @@ import { ConfigService } from '@nestjs/config';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { User } from '../auth/user.entity';
 import { ApiResponse } from '../common/dto/api-response.dto';
+import { Post } from '../posts/post.entity';
 
 @Injectable()
 export class UploadService {
@@ -13,6 +14,8 @@ export class UploadService {
   constructor(
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
+    @InjectRepository(Post)
+    private readonly postRepo: Repository<Post>,
     private configService: ConfigService,
   ) {
     const supabaseUrl = this.configService.get<string>('supabase.url');
@@ -330,6 +333,230 @@ export class UploadService {
         message: 'Error deleting avatar.',
         error: error.message,
       };
+    }
+  }
+
+  async uploadPostImage(
+    userId: string,
+    file: Express.Multer.File,
+    token?: string,
+    postId?: string,
+  ): Promise<ApiResponse> {
+    try {
+      console.log('UploadPostImage - Starting upload process');
+
+      // Validate file
+      if (!file) {
+        return ApiResponse.error('No file provided.');
+      }
+
+      // Check file type
+      const allowedTypes = [
+        'image/jpeg',
+        'image/png',
+        'image/jpg',
+        'image/webp',
+      ];
+      if (!allowedTypes.includes(file.mimetype)) {
+        return ApiResponse.error(
+          'Invalid file type. Only JPEG, PNG, and WebP images are allowed.',
+        );
+      }
+
+      // Check file size (max 5MB)
+      const maxSize = 5 * 1024 * 1024; // 5MB
+      if (file.size > maxSize) {
+        return ApiResponse.error('File too large. Maximum size is 5MB.');
+      }
+
+      // If postId is provided, check ownership
+      if (postId) {
+        const post = await this.postRepo.findOne({ where: { id: postId } });
+        if (!post) {
+          return ApiResponse.error('Post not found.');
+        }
+        if (post.userId !== userId) {
+          return ApiResponse.error(
+            'You can only upload images for your own posts.',
+          );
+        }
+      }
+
+      const fileName = postId
+        ? `posts/${postId}/image_${Date.now()}.jpg`
+        : `posts/temp/${userId}/image_${Date.now()}.jpg`;
+
+      console.log('UploadPostImage - File name:', fileName);
+
+      // Create authenticated client if token provided
+      let client = this.supabase;
+      if (token) {
+        client = createClient(
+          this.configService.get<string>('supabase.url')!,
+          this.configService.get<string>('supabase.serviceRoleKey')!,
+          {
+            global: {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            },
+          },
+        );
+      }
+
+      // Convert buffer to Uint8Array for Supabase
+      const fileBuffer = new Uint8Array(file.buffer);
+
+      console.log('UploadPostImage - Uploading to Supabase storage');
+
+      // Upload to Supabase storage
+      const { data, error } = await client.storage
+        .from('posts')
+        .upload(fileName, fileBuffer, {
+          contentType: file.mimetype,
+          upsert: false,
+        });
+
+      if (error) {
+        console.error('Supabase storage upload error:', error);
+        return ApiResponse.error(`Upload failed: ${error.message}`);
+      }
+
+      console.log('UploadPostImage - Upload successful, getting public URL');
+
+      // Get public URL
+      const { data: urlData } = client.storage
+        .from('posts')
+        .getPublicUrl(fileName);
+
+      const imageUrl = urlData.publicUrl;
+
+      console.log('UploadPostImage - Public URL:', imageUrl);
+
+      // If postId is provided, update the post
+      if (postId) {
+        await this.postRepo.update(postId, { imageUrl });
+        console.log('UploadPostImage - Post updated with image URL');
+      }
+
+      return ApiResponse.success('Post image uploaded successfully.', {
+        imageUrl,
+      });
+    } catch (error) {
+      console.error('Unexpected error in uploadPostImage:', error);
+      return ApiResponse.error('Error uploading post image.', error.message);
+    }
+  }
+
+  async updatePostImage(
+    userId: string,
+    postId: string,
+    file: Express.Multer.File,
+    token?: string,
+  ): Promise<ApiResponse> {
+    try {
+      console.log('UpdatePostImage - Starting update process');
+
+      if (!postId) {
+        return ApiResponse.error(
+          'Post ID is required for updating post image.',
+        );
+      }
+
+      // Check if post exists and user owns it
+      const post = await this.postRepo.findOne({ where: { id: postId } });
+      if (!post) {
+        return ApiResponse.error('Post not found.');
+      }
+      if (post.userId !== userId) {
+        return ApiResponse.error(
+          'You can only update images for your own posts.',
+        );
+      }
+
+      // Validate file
+      if (!file) {
+        return ApiResponse.error('No file provided.');
+      }
+
+      // Check file type
+      const allowedTypes = [
+        'image/jpeg',
+        'image/png',
+        'image/jpg',
+        'image/webp',
+      ];
+      if (!allowedTypes.includes(file.mimetype)) {
+        return ApiResponse.error(
+          'Invalid file type. Only JPEG, PNG, and WebP images are allowed.',
+        );
+      }
+
+      // Check file size (max 5MB)
+      const maxSize = 5 * 1024 * 1024; // 5MB
+      if (file.size > maxSize) {
+        return ApiResponse.error('File too large. Maximum size is 5MB.');
+      }
+
+      const fileName = `posts/${postId}/image_${Date.now()}.jpg`;
+
+      console.log('UpdatePostImage - File name:', fileName);
+
+      // Create authenticated client if token provided
+      let client = this.supabase;
+      if (token) {
+        client = createClient(
+          this.configService.get<string>('supabase.url')!,
+          this.configService.get<string>('supabase.serviceRoleKey')!,
+          {
+            global: {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            },
+          },
+        );
+      }
+
+      // Convert buffer to Uint8Array for Supabase
+      const fileBuffer = new Uint8Array(file.buffer);
+
+      console.log('UpdatePostImage - Uploading to Supabase storage');
+
+      // Upload to Supabase storage (upsert to replace existing)
+      const { data, error } = await client.storage
+        .from('posts')
+        .upload(fileName, fileBuffer, {
+          contentType: file.mimetype,
+          upsert: true,
+        });
+
+      if (error) {
+        console.error('Supabase storage upload error:', error);
+        return ApiResponse.error(`Upload failed: ${error.message}`);
+      }
+
+      console.log('UpdatePostImage - Upload successful, getting public URL');
+
+      // Get public URL
+      const { data: urlData } = client.storage
+        .from('posts')
+        .getPublicUrl(fileName);
+
+      const imageUrl = urlData.publicUrl;
+
+      console.log('UpdatePostImage - Public URL:', imageUrl);
+
+      // Update the post with new image URL
+      await this.postRepo.update(postId, { imageUrl });
+      console.log('UpdatePostImage - Post updated with new image URL');
+
+      return ApiResponse.success('Post image updated successfully.', {
+        imageUrl,
+      });
+    } catch (error) {
+      console.error('Unexpected error in updatePostImage:', error);
+      return ApiResponse.error('Error updating post image.', error.message);
     }
   }
 }
