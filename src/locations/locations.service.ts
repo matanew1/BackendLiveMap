@@ -56,7 +56,7 @@ export class LocationsService {
              ST_Y(ul.location::geometry) AS lat,
              ST_X(ul.location::geometry) AS lng,
              ST_Distance(ul.location, ST_MakePoint($2, $1)::geography) AS distance,
-             u."dogBreed", u."dogName"
+             u."dogBreed", u."dogName", u."avatarUrl"
       FROM users_locations ul
       LEFT JOIN users u ON ul.user_id = u.id
       WHERE ST_DWithin(ul.location, ST_MakePoint($2, $1)::geography, $3)
