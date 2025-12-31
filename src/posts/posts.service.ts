@@ -3,9 +3,12 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  Inject,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import type { Cache } from 'cache-manager';
 import { v4 as uuidv4 } from 'uuid';
 import { Post } from './post.entity';
 import { PostLike } from './post-like.entity';
@@ -23,6 +26,7 @@ export class PostsService {
     private readonly postLikeRepo: Repository<PostLike>,
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
   private formatTimeAgo(date: Date): string {
@@ -64,12 +68,22 @@ export class PostsService {
   }
 
   async getAllPosts(): Promise<PostResponseDto[]> {
+    const cacheKey = 'posts_feed';
+    const cached = await this.cacheManager.get<PostResponseDto[]>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     const posts = await this.postRepo.find({
       order: { createdAt: 'DESC' },
       relations: ['user'],
     });
 
-    return Promise.all(posts.map((post) => this.mapPostToResponse(post)));
+    const result = await Promise.all(
+      posts.map((post) => this.mapPostToResponse(post)),
+    );
+    await this.cacheManager.set(cacheKey, result, 600000); // 10 minutes TTL
+    return result;
   }
 
   async getPostsByUser(userId: string): Promise<PostResponseDto[]> {
@@ -113,6 +127,7 @@ export class PostsService {
     );
 
     const post = result[0];
+    await this.cacheManager.del('posts_feed'); // Invalidate cache
     return this.mapPostToResponse(post);
   }
 
@@ -144,6 +159,7 @@ export class PostsService {
     }
 
     const updatedPost = await this.postRepo.save(post);
+    await this.cacheManager.del('posts_feed'); // Invalidate cache
     return this.mapPostToResponse(updatedPost);
   }
 
@@ -159,6 +175,7 @@ export class PostsService {
     }
 
     await this.postRepo.remove(post);
+    await this.cacheManager.del('posts_feed'); // Invalidate cache
   }
 
   async toggleLike(userId: string, postId: string): Promise<{ likes: number }> {

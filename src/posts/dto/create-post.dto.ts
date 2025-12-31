@@ -1,6 +1,27 @@
 // src/posts/dto/create-post.dto.ts
-import { IsString, IsOptional, IsNumber, Min, Max } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsNumber,
+  Min,
+  Max,
+  MaxLength,
+  ValidateNested,
+} from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
+
+class LocationDto {
+  @IsNumber()
+  @Min(-90)
+  @Max(90)
+  lat: number;
+
+  @IsNumber()
+  @Min(-180)
+  @Max(180)
+  lng: number;
+}
 
 export class CreatePostDto {
   @ApiProperty({
@@ -8,6 +29,7 @@ export class CreatePostDto {
     example: 'My dog had a great time at the park today!',
   })
   @IsString()
+  @MaxLength(500)
   content: string;
 
   @ApiProperty({
@@ -16,5 +38,7 @@ export class CreatePostDto {
     required: false,
   })
   @IsOptional()
-  location?: { lat: number; lng: number };
+  @ValidateNested()
+  @Type(() => LocationDto)
+  location?: LocationDto;
 }

@@ -1,8 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import type { Cache } from 'cache-manager';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { User, UserRole } from './user.entity';
 import { ApiResponse } from '../common/dto/api-response.dto';
@@ -16,6 +18,7 @@ export class AuthService {
     private readonly userRepo: Repository<User>,
     private configService: ConfigService,
     private jwtService: JwtService,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {
     const supabaseUrl = this.configService.get<string>('supabase.url');
     const supabaseKey = this.configService.get<string>(
@@ -148,12 +151,20 @@ export class AuthService {
   }
 
   async getUserProfile(userId: string): Promise<ApiResponse<User>> {
+    const cacheKey = `user_profile:${userId}`;
+    const cached = await this.cacheManager.get<ApiResponse<User>>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     try {
       const user = await this.userRepo.findOne({ where: { id: userId } });
       if (!user) {
         return ApiResponse.error('User profile not found.');
       }
-      return ApiResponse.success('User profile retrieved.', user);
+      const result = ApiResponse.success('User profile retrieved.', user);
+      await this.cacheManager.set(cacheKey, result, 300000); // 5 minutes TTL
+      return result;
     } catch (error) {
       return ApiResponse.error('Error retrieving user profile.', error.message);
     }
@@ -162,6 +173,7 @@ export class AuthService {
   async updateUserRole(userId: string, role: UserRole) {
     try {
       const updatedUser = await this.userRepo.update(userId, { role });
+      await this.cacheManager.del(`user_profile:${userId}`); // Invalidate cache
       return {
         success: true,
         message: 'User role updated.',
@@ -190,6 +202,8 @@ export class AuthService {
       const updatedUser = await this.userRepo.findOne({
         where: { id: userId },
       });
+
+      await this.cacheManager.del(`user_profile:${userId}`); // Invalidate cache
 
       return {
         success: true,
