@@ -55,8 +55,8 @@ export class AuthService {
       }
 
       return ApiResponse.success(
-        'Account created successfully. Please check your email for verification.',
         data,
+        'Account created successfully. Please check your email for verification.',
       );
     } catch (error) {
       return ApiResponse.error(
@@ -87,10 +87,13 @@ export class AuthService {
       };
       const accessToken = this.jwtService.sign(payload);
 
-      return ApiResponse.success('Signed in successfully.', {
-        accessToken,
-        user: data.user,
-      });
+      return ApiResponse.success(
+        {
+          accessToken,
+          user: data.user,
+        },
+        'Signed in successfully.',
+      );
     } catch (error) {
       return ApiResponse.error(
         'An unexpected error occurred during signin.',
@@ -162,7 +165,7 @@ export class AuthService {
       if (!user) {
         return ApiResponse.error('User profile not found.');
       }
-      const result = ApiResponse.success('User profile retrieved.', user);
+      const result = ApiResponse.success(user, 'User profile retrieved.');
       await this.cacheManager.set(cacheKey, result, 300000); // 5 minutes TTL
       return result;
     } catch (error) {

@@ -20,7 +20,7 @@ export class ApiResponse<T = any> {
     this.error = error;
   }
 
-  static success<T>(message: string, data?: T): ApiResponse<T> {
+  static success<T>(data: T, message: string): ApiResponse<T> {
     return new ApiResponse(true, message, data);
   }
 

@@ -10,12 +10,11 @@ import {
   UseGuards,
   Req,
   HttpStatus,
-  HttpException,
 } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
-  ApiResponse,
+  ApiResponse as SwaggerApiResponse,
   ApiBearerAuth,
   ApiExtraModels,
 } from '@nestjs/swagger';
@@ -34,6 +33,7 @@ import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { PostResponseDto } from './dto/post-response.dto';
 import { LikeResponseDto } from './dto/like-response.dto';
+import { ApiResponse } from '../common/dto/api-response.dto';
 
 @ApiExtraModels(PostResponseDto, LikeResponseDto)
 @ApiTags('posts')
@@ -46,15 +46,16 @@ export class PostsController {
     summary: 'Get all posts (feed)',
     description: 'Retrieve all posts in reverse chronological order',
   })
-  @ApiResponse({
+  @SwaggerApiResponse({
     status: 200,
     description: 'Posts retrieved successfully',
     type: [PostResponseDto],
   })
   @ApiBearerAuth('JWT-auth')
   @UseGuards(SupabaseAuthGuard)
-  async getAllPosts(): Promise<PostResponseDto[]> {
-    return this.postsService.getAllPosts();
+  async getAllPosts(): Promise<ApiResponse<PostResponseDto[]>> {
+    const posts = await this.postsService.getAllPosts();
+    return ApiResponse.success(posts, 'Posts retrieved successfully');
   }
 
   @Get('user/:userId')
@@ -62,12 +63,12 @@ export class PostsController {
     summary: 'Get posts by user',
     description: 'Retrieve all posts by a specific user',
   })
-  @ApiResponse({
+  @SwaggerApiResponse({
     status: 200,
     description: 'Posts retrieved successfully',
     type: [PostResponseDto],
   })
-  @ApiResponse({
+  @SwaggerApiResponse({
     status: 404,
     description: 'User not found',
   })
@@ -75,8 +76,9 @@ export class PostsController {
   @UseGuards(SupabaseAuthGuard)
   async getPostsByUser(
     @Param('userId') userId: string,
-  ): Promise<PostResponseDto[]> {
-    return this.postsService.getPostsByUser(userId);
+  ): Promise<ApiResponse<PostResponseDto[]>> {
+    const posts = await this.postsService.getPostsByUser(userId);
+    return ApiResponse.success(posts, 'Posts retrieved successfully');
   }
 
   @Get(':postId')
@@ -84,19 +86,22 @@ export class PostsController {
     summary: 'Get single post',
     description: 'Retrieve a specific post by ID',
   })
-  @ApiResponse({
+  @SwaggerApiResponse({
     status: 200,
     description: 'Post retrieved successfully',
     type: PostResponseDto,
   })
-  @ApiResponse({
+  @SwaggerApiResponse({
     status: 404,
     description: 'Post not found',
   })
   @ApiBearerAuth('JWT-auth')
   @UseGuards(SupabaseAuthGuard)
-  async getPostById(@Param('postId') postId: string): Promise<PostResponseDto> {
-    return this.postsService.getPostById(postId);
+  async getPostById(
+    @Param('postId') postId: string,
+  ): Promise<ApiResponse<PostResponseDto>> {
+    const post = await this.postsService.getPostById(postId);
+    return ApiResponse.success(post, 'Post retrieved successfully');
   }
 
   @Post()
@@ -104,12 +109,12 @@ export class PostsController {
     summary: 'Create new post',
     description: 'Create a new post for the authenticated user',
   })
-  @ApiResponse({
+  @SwaggerApiResponse({
     status: 201,
     description: 'Post created successfully',
     type: PostResponseDto,
   })
-  @ApiResponse({
+  @SwaggerApiResponse({
     status: 400,
     description: 'Bad request - invalid data',
   })
@@ -118,18 +123,12 @@ export class PostsController {
   async createPost(
     @Req() request: Request,
     @Body() createPostDto: CreatePostDto,
-  ): Promise<PostResponseDto> {
-    try {
-      return await this.postsService.createPost(request.user.id, createPostDto);
-    } catch (error) {
-      throw new HttpException(
-        {
-          message: error.message || 'Failed to create post',
-          statusCode: HttpStatus.BAD_REQUEST,
-        },
-        HttpStatus.BAD_REQUEST,
-      );
-    }
+  ): Promise<ApiResponse<PostResponseDto>> {
+    const post = await this.postsService.createPost(
+      request.user.id,
+      createPostDto,
+    );
+    return ApiResponse.success(post, 'Post created successfully');
   }
 
   @Patch(':postId')
@@ -137,16 +136,16 @@ export class PostsController {
     summary: 'Update post',
     description: 'Update an existing post (only by the post owner)',
   })
-  @ApiResponse({
+  @SwaggerApiResponse({
     status: 200,
     description: 'Post updated successfully',
     type: PostResponseDto,
   })
-  @ApiResponse({
+  @SwaggerApiResponse({
     status: 403,
     description: 'Forbidden - can only update own posts',
   })
-  @ApiResponse({
+  @SwaggerApiResponse({
     status: 404,
     description: 'Post not found',
   })
@@ -156,25 +155,13 @@ export class PostsController {
     @Req() request: Request,
     @Param('postId') postId: string,
     @Body() updatePostDto: UpdatePostDto,
-  ): Promise<PostResponseDto> {
-    try {
-      return await this.postsService.updatePost(
-        request.user.id,
-        postId,
-        updatePostDto,
-      );
-    } catch (error) {
-      if (error instanceof HttpException) {
-        throw error;
-      }
-      throw new HttpException(
-        {
-          message: error.message || 'Failed to update post',
-          statusCode: HttpStatus.BAD_REQUEST,
-        },
-        HttpStatus.BAD_REQUEST,
-      );
-    }
+  ): Promise<ApiResponse<PostResponseDto>> {
+    const post = await this.postsService.updatePost(
+      request.user.id,
+      postId,
+      updatePostDto,
+    );
+    return ApiResponse.success(post, 'Post updated successfully');
   }
 
   @Delete(':postId')
@@ -182,15 +169,15 @@ export class PostsController {
     summary: 'Delete post',
     description: 'Delete an existing post (only by the post owner)',
   })
-  @ApiResponse({
+  @SwaggerApiResponse({
     status: 204,
     description: 'Post deleted successfully',
   })
-  @ApiResponse({
+  @SwaggerApiResponse({
     status: 403,
     description: 'Forbidden - can only delete own posts',
   })
-  @ApiResponse({
+  @SwaggerApiResponse({
     status: 404,
     description: 'Post not found',
   })
@@ -199,21 +186,9 @@ export class PostsController {
   async deletePost(
     @Req() request: Request,
     @Param('postId') postId: string,
-  ): Promise<void> {
-    try {
-      await this.postsService.deletePost(request.user.id, postId);
-    } catch (error) {
-      if (error instanceof HttpException) {
-        throw error;
-      }
-      throw new HttpException(
-        {
-          message: error.message || 'Failed to delete post',
-          statusCode: HttpStatus.BAD_REQUEST,
-        },
-        HttpStatus.BAD_REQUEST,
-      );
-    }
+  ): Promise<ApiResponse<null>> {
+    await this.postsService.deletePost(request.user.id, postId);
+    return ApiResponse.success(null, 'Post deleted successfully');
   }
 
   @Post(':postId/like')
@@ -222,12 +197,12 @@ export class PostsController {
     description:
       'Like or unlike a post. If user already liked, it will unlike; otherwise it will like.',
   })
-  @ApiResponse({
+  @SwaggerApiResponse({
     status: 200,
     description: 'Like toggled successfully',
     type: LikeResponseDto,
   })
-  @ApiResponse({
+  @SwaggerApiResponse({
     status: 404,
     description: 'Post not found',
   })
@@ -236,20 +211,11 @@ export class PostsController {
   async toggleLike(
     @Req() request: Request,
     @Param('postId') postId: string,
-  ): Promise<LikeResponseDto> {
-    try {
-      return await this.postsService.toggleLike(request.user.id, postId);
-    } catch (error) {
-      if (error instanceof HttpException) {
-        throw error;
-      }
-      throw new HttpException(
-        {
-          message: error.message || 'Failed to toggle like',
-          statusCode: HttpStatus.BAD_REQUEST,
-        },
-        HttpStatus.BAD_REQUEST,
-      );
-    }
+  ): Promise<ApiResponse<LikeResponseDto>> {
+    const likeResponse = await this.postsService.toggleLike(
+      request.user.id,
+      postId,
+    );
+    return ApiResponse.success(likeResponse, 'Like toggled successfully');
   }
 }

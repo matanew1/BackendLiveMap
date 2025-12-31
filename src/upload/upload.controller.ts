@@ -5,7 +5,6 @@ import {
   Get,
   Headers,
   UseGuards,
-  HttpException,
   HttpStatus,
   Param,
   Patch,
@@ -17,7 +16,7 @@ import {
 import {
   ApiTags,
   ApiOperation,
-  ApiResponse,
+  ApiResponse as SwaggerApiResponse,
   ApiBearerAuth,
   ApiExtraModels,
   ApiConsumes,
@@ -36,6 +35,7 @@ import { Token } from '../common/decorators/token.decorator';
 import { SupabaseAuthGuard } from '../auth/auth.guard';
 import { UploadService } from './upload.service';
 import { User } from '../auth/user.entity';
+import { ApiResponse } from '../common/dto/api-response.dto';
 
 @ApiExtraModels(User) // To document User model in Swagger
 @ApiTags('upload')
@@ -49,7 +49,7 @@ export class UploadController {
     description:
       'Upload a new avatar image for the authenticated user. The image will be stored in Supabase Storage under users/{userId}/avatar.jpg and overwrite any existing avatar.',
   })
-  @ApiResponse({
+  @SwaggerApiResponse({
     status: 200,
     description: 'Avatar uploaded successfully',
     schema: {
@@ -70,11 +70,11 @@ export class UploadController {
       },
     },
   })
-  @ApiResponse({
+  @SwaggerApiResponse({
     status: 400,
     description: 'Bad request - invalid file or storage error',
   })
-  @ApiResponse({
+  @SwaggerApiResponse({
     status: 401,
     description: 'Unauthorized - invalid or missing JWT token',
   })
@@ -101,41 +101,16 @@ export class UploadController {
     @UploadedFile() file: Express.Multer.File,
     @Token() token: string,
   ) {
-    try {
-      const result = await this.uploadService.uploadAvatar(
-        request.user.id,
-        file,
-        token,
-      );
+    const result = await this.uploadService.uploadAvatar(
+      request.user.id,
+      file,
+      token,
+    );
 
-      if (result.success) {
-        return {
-          statusCode: HttpStatus.OK,
-          message: result.message,
-          data: result.data,
-        };
-      } else {
-        throw new HttpException(
-          {
-            statusCode: HttpStatus.BAD_REQUEST,
-            message: result.message,
-            error: result.error,
-          },
-          HttpStatus.BAD_REQUEST,
-        );
-      }
-    } catch (error) {
-      if (error instanceof HttpException) {
-        throw error;
-      }
-      throw new HttpException(
-        {
-          statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-          message: 'An unexpected error occurred while uploading avatar.',
-          error: error.message,
-        },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+    if (result.success) {
+      return ApiResponse.success(result.data, result.message);
+    } else {
+      return ApiResponse.error(result.message, result.error);
     }
   }
 
@@ -145,7 +120,7 @@ export class UploadController {
     description:
       'Update the existing avatar image for the authenticated user. This will replace the current avatar with a new image.',
   })
-  @ApiResponse({
+  @SwaggerApiResponse({
     status: 200,
     description: 'Avatar updated successfully',
     schema: {
@@ -172,15 +147,15 @@ export class UploadController {
       },
     },
   })
-  @ApiResponse({
+  @SwaggerApiResponse({
     status: 400,
     description: 'Bad request - invalid file or storage error',
   })
-  @ApiResponse({
+  @SwaggerApiResponse({
     status: 401,
     description: 'Unauthorized - invalid or missing JWT token',
   })
-  @ApiResponse({ status: 404, description: 'User not found' })
+  @SwaggerApiResponse({ status: 404, description: 'User not found' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     description: 'New avatar image file (JPEG, PNG, etc.)',
@@ -204,41 +179,16 @@ export class UploadController {
     @UploadedFile() file: Express.Multer.File,
     @Token() token: string,
   ) {
-    try {
-      const result = await this.uploadService.updateAvatar(
-        request.user.id,
-        file,
-        token,
-      );
+    const result = await this.uploadService.updateAvatar(
+      request.user.id,
+      file,
+      token,
+    );
 
-      if (result.success) {
-        return {
-          statusCode: HttpStatus.OK,
-          message: result.message,
-          data: result.data,
-        };
-      } else {
-        throw new HttpException(
-          {
-            statusCode: HttpStatus.BAD_REQUEST,
-            message: result.message,
-            error: result.error,
-          },
-          HttpStatus.BAD_REQUEST,
-        );
-      }
-    } catch (error) {
-      if (error instanceof HttpException) {
-        throw error;
-      }
-      throw new HttpException(
-        {
-          statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-          message: 'An unexpected error occurred while updating avatar.',
-          error: error.message,
-        },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+    if (result.success) {
+      return ApiResponse.success(result.data, result.message);
+    } else {
+      return ApiResponse.error(result.message, result.error);
     }
   }
 
@@ -250,7 +200,7 @@ export class UploadController {
     description:
       "Deletes the authenticated user's avatar from storage and database",
   })
-  @ApiResponse({
+  @SwaggerApiResponse({
     status: 200,
     description: 'Avatar deleted successfully',
     schema: {
@@ -267,47 +217,22 @@ export class UploadController {
       },
     },
   })
-  @ApiResponse({
+  @SwaggerApiResponse({
     status: 400,
     description: 'Bad request - User not found or no avatar to delete',
   })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 500, description: 'Internal server error' })
+  @SwaggerApiResponse({ status: 401, description: 'Unauthorized' })
+  @SwaggerApiResponse({ status: 500, description: 'Internal server error' })
   async deleteAvatar(@Req() request: Request, @Token() token: string) {
-    try {
-      const result = await this.uploadService.deleteAvatar(
-        request.user.id,
-        token,
-      );
+    const result = await this.uploadService.deleteAvatar(
+      request.user.id,
+      token,
+    );
 
-      if (result.success) {
-        return {
-          statusCode: HttpStatus.OK,
-          message: result.message,
-          data: result.data,
-        };
-      } else {
-        throw new HttpException(
-          {
-            statusCode: HttpStatus.BAD_REQUEST,
-            message: result.message,
-            error: result.error,
-          },
-          HttpStatus.BAD_REQUEST,
-        );
-      }
-    } catch (error) {
-      if (error instanceof HttpException) {
-        throw error;
-      }
-      throw new HttpException(
-        {
-          statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-          message: 'An unexpected error occurred while deleting avatar.',
-          error: error.message,
-        },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+    if (result.success) {
+      return ApiResponse.success(result.data, result.message);
+    } else {
+      return ApiResponse.error(result.message, result.error);
     }
   }
 }

@@ -5,7 +5,6 @@ import {
   Get,
   Headers,
   UseGuards,
-  HttpException,
   HttpStatus,
   Param,
   Patch,
@@ -16,7 +15,7 @@ import { Throttle } from '@nestjs/throttler';
 import {
   ApiTags,
   ApiOperation,
-  ApiResponse,
+  ApiResponse as SwaggerApiResponse,
   ApiBearerAuth,
   ApiExtraModels,
 } from '@nestjs/swagger';
@@ -40,6 +39,7 @@ import {
   UpdateRoleDto,
   UpdateProfileDto,
 } from './dto/auth.dto';
+import { ApiResponse } from '../common/dto/api-response.dto';
 
 @ApiExtraModels(User)
 @ApiTags('auth')
@@ -50,253 +50,129 @@ export class AuthController {
   @Post('signup')
   @Throttle({ default: { limit: 3, ttl: 60000 } }) // 3 requests per minute for signup
   @ApiOperation({ summary: 'Sign up a new user' })
-  @ApiResponse({ status: 201, description: 'User created successfully' })
-  @ApiResponse({
+  @SwaggerApiResponse({ status: 201, description: 'User created successfully' })
+  @SwaggerApiResponse({
     status: 400,
     description: 'Bad request - Invalid email or password',
   })
-  @ApiResponse({ status: 500, description: 'Internal server error' })
+  @SwaggerApiResponse({ status: 500, description: 'Internal server error' })
   async signUp(@Body() signUpDto: SignUpDto) {
-    try {
-      const result = await this.authService.signUp(
-        signUpDto.email,
-        signUpDto.password,
-      );
+    const result = await this.authService.signUp(
+      signUpDto.email,
+      signUpDto.password,
+    );
 
-      if (result.success) {
-        return {
-          statusCode: HttpStatus.CREATED,
-          message: result.message,
-          data: result.data,
-        };
-      } else {
-        throw new HttpException(
-          {
-            statusCode: HttpStatus.BAD_REQUEST,
-            message: result.message,
-            error: result.error,
-          },
-          HttpStatus.BAD_REQUEST,
-        );
-      }
-    } catch (error) {
-      if (error instanceof HttpException) {
-        throw error;
-      }
-      throw new HttpException(
-        {
-          statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-          message: 'An unexpected error occurred during signup.',
-          error: error.message,
-        },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+    if (result.success) {
+      return ApiResponse.success(result.data, result.message);
+    } else {
+      return ApiResponse.error(result.message, result.error);
     }
   }
 
   @Post('signin')
   @Throttle({ default: { limit: 5, ttl: 60000 } }) // 5 requests per minute for signin
   @ApiOperation({ summary: 'Sign in user' })
-  @ApiResponse({ status: 200, description: 'User signed in successfully' })
-  @ApiResponse({
+  @SwaggerApiResponse({
+    status: 200,
+    description: 'User signed in successfully',
+  })
+  @SwaggerApiResponse({
     status: 401,
     description: 'Unauthorized - Invalid credentials',
   })
-  @ApiResponse({ status: 500, description: 'Internal server error' })
+  @SwaggerApiResponse({ status: 500, description: 'Internal server error' })
   async signIn(@Body() signInDto: SignInDto) {
-    try {
-      const result = await this.authService.signIn(
-        signInDto.email,
-        signInDto.password,
-      );
+    const result = await this.authService.signIn(
+      signInDto.email,
+      signInDto.password,
+    );
 
-      if (result.success) {
-        return {
-          statusCode: HttpStatus.OK,
-          message: result.message,
-          data: result.data,
-        };
-      } else {
-        throw new HttpException(
-          {
-            statusCode: HttpStatus.UNAUTHORIZED,
-            message: result.message,
-            error: result.error,
-          },
-          HttpStatus.UNAUTHORIZED,
-        );
-      }
-    } catch (error) {
-      if (error instanceof HttpException) {
-        throw error;
-      }
-      throw new HttpException(
-        {
-          statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-          message: 'An unexpected error occurred during signin.',
-          error: error.message,
-        },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+    if (result.success) {
+      return ApiResponse.success(result.data, result.message);
+    } else {
+      return ApiResponse.error(result.message, result.error);
     }
   }
 
   @Post('signout')
   @ApiOperation({ summary: 'Sign out user' })
-  @ApiResponse({ status: 200, description: 'User signed out successfully' })
-  @ApiResponse({ status: 400, description: 'Bad request - Sign out failed' })
-  @ApiResponse({ status: 500, description: 'Internal server error' })
+  @SwaggerApiResponse({
+    status: 200,
+    description: 'User signed out successfully',
+  })
+  @SwaggerApiResponse({
+    status: 400,
+    description: 'Bad request - Sign out failed',
+  })
+  @SwaggerApiResponse({ status: 500, description: 'Internal server error' })
   @ApiBearerAuth('JWT-auth')
   @UseGuards(SupabaseAuthGuard)
   async signOut() {
-    try {
-      const result = await this.authService.signOut();
+    const result = await this.authService.signOut();
 
-      if (result.success) {
-        return {
-          statusCode: HttpStatus.OK,
-          message: result.message,
-        };
-      } else {
-        throw new HttpException(
-          {
-            statusCode: HttpStatus.BAD_REQUEST,
-            message: result.message,
-            error: result.error,
-          },
-          HttpStatus.BAD_REQUEST,
-        );
-      }
-    } catch (error) {
-      if (error instanceof HttpException) {
-        throw error;
-      }
-      throw new HttpException(
-        {
-          statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-          message: 'An unexpected error occurred during signout.',
-          error: error.message,
-        },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+    if (result.success) {
+      return ApiResponse.success(null, result.message);
+    } else {
+      return ApiResponse.error(result.message, result.error);
     }
   }
 
   @Get('me')
   @ApiOperation({ summary: 'Get current user info' })
-  @ApiResponse({ status: 200, description: 'User info retrieved' })
-  @ApiResponse({ status: 401, description: 'Unauthorized - Invalid token' })
-  @ApiResponse({ status: 500, description: 'Internal server error' })
+  @SwaggerApiResponse({ status: 200, description: 'User info retrieved' })
+  @SwaggerApiResponse({
+    status: 401,
+    description: 'Unauthorized - Invalid token',
+  })
+  @SwaggerApiResponse({ status: 500, description: 'Internal server error' })
   @ApiBearerAuth('JWT-auth')
   @UseGuards(SupabaseAuthGuard)
   async getUser(@Req() request: Request) {
-    try {
-      return {
-        statusCode: HttpStatus.OK,
-        message: 'User information retrieved successfully.',
-        data: request.user,
-      };
-    } catch (error) {
-      if (error instanceof HttpException) {
-        throw error;
-      }
-      throw new HttpException(
-        {
-          statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-          message:
-            'An unexpected error occurred while getting user information.',
-          error: error.message,
-        },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
+    return ApiResponse.success(
+      request.user,
+      'User information retrieved successfully.',
+    );
   }
 
   @Post('refresh')
   @ApiOperation({ summary: 'Refresh access token' })
-  @ApiResponse({ status: 200, description: 'Token refreshed successfully' })
-  @ApiResponse({ status: 400, description: 'Refresh failed' })
+  @SwaggerApiResponse({
+    status: 200,
+    description: 'Token refreshed successfully',
+  })
+  @SwaggerApiResponse({ status: 400, description: 'Refresh failed' })
   async refreshToken(@Body() refreshTokenDto: RefreshTokenDto) {
-    try {
-      const result = await this.authService.refreshToken(
-        refreshTokenDto.refreshToken,
-      );
+    const result = await this.authService.refreshToken(
+      refreshTokenDto.refreshToken,
+    );
 
-      if (result.success) {
-        return {
-          statusCode: HttpStatus.OK,
-          message: result.message,
-          data: result.data,
-        };
-      } else {
-        throw new HttpException(
-          {
-            statusCode: HttpStatus.BAD_REQUEST,
-            message: result.message,
-            error: result.error,
-          },
-          HttpStatus.BAD_REQUEST,
-        );
-      }
-    } catch (error) {
-      if (error instanceof HttpException) {
-        throw error;
-      }
-      throw new HttpException(
-        {
-          statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-          message: 'An unexpected error occurred during token refresh.',
-          error: error.message,
-        },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+    if (result.success) {
+      return ApiResponse.success(result.data, result.message);
+    } else {
+      return ApiResponse.error(result.message, result.error);
     }
   }
 
   @Get('profile')
   @ApiOperation({ summary: 'Get user profile' })
-  @ApiResponse({ status: 200, description: 'Profile retrieved' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @SwaggerApiResponse({ status: 200, description: 'Profile retrieved' })
+  @SwaggerApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiBearerAuth('JWT-auth')
   @UseGuards(SupabaseAuthGuard)
   async getProfile(@Req() request: Request) {
-    try {
-      const profile = await this.authService.getUserProfile(request.user.id);
+    const profile = await this.authService.getUserProfile(request.user.id);
 
-      if (profile.success) {
-        return {
-          statusCode: HttpStatus.OK,
-          message: profile.message,
-          data: profile.data,
-        };
-      } else {
-        throw new HttpException(
-          {
-            statusCode: HttpStatus.NOT_FOUND,
-            message: profile.message,
-          },
-          HttpStatus.NOT_FOUND,
-        );
-      }
-    } catch (error) {
-      if (error instanceof HttpException) {
-        throw error;
-      }
-      throw new HttpException(
-        {
-          statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-          message: 'An unexpected error occurred while getting profile.',
-          error: error.message,
-        },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+    if (profile.success) {
+      return ApiResponse.success(profile.data, profile.message);
+    } else {
+      return ApiResponse.error(profile.message);
     }
   }
 
   @Patch('role/:userId')
   @ApiOperation({ summary: 'Update user role (admin only)' })
-  @ApiResponse({ status: 200, description: 'Role updated' })
-  @ApiResponse({ status: 403, description: 'Forbidden' })
+  @SwaggerApiResponse({ status: 200, description: 'Role updated' })
+  @SwaggerApiResponse({ status: 403, description: 'Forbidden' })
   @ApiBearerAuth('JWT-auth')
   @UseGuards(SupabaseAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
@@ -304,46 +180,21 @@ export class AuthController {
     @Param('userId') userId: string,
     @Body() updateRoleDto: UpdateRoleDto,
   ) {
-    try {
-      const result = await this.authService.updateUserRole(
-        userId,
-        updateRoleDto.role,
-      );
+    const result = await this.authService.updateUserRole(
+      userId,
+      updateRoleDto.role,
+    );
 
-      if (result.success) {
-        return {
-          statusCode: HttpStatus.OK,
-          message: result.message,
-          data: result.data,
-        };
-      } else {
-        throw new HttpException(
-          {
-            statusCode: HttpStatus.BAD_REQUEST,
-            message: result.message,
-            error: result.error,
-          },
-          HttpStatus.BAD_REQUEST,
-        );
-      }
-    } catch (error) {
-      if (error instanceof HttpException) {
-        throw error;
-      }
-      throw new HttpException(
-        {
-          statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-          message: 'An unexpected error occurred while updating role.',
-          error: error.message,
-        },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+    if (result.success) {
+      return ApiResponse.success(result.data, result.message);
+    } else {
+      return ApiResponse.error(result.message, result.error);
     }
   }
 
   @Patch('profile')
   @ApiOperation({ summary: 'Update user profile' })
-  @ApiResponse({
+  @SwaggerApiResponse({
     status: 200,
     description: 'Profile updated',
     schema: {
@@ -355,47 +206,22 @@ export class AuthController {
       },
     },
   })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @SwaggerApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiBearerAuth('JWT-auth')
   @UseGuards(SupabaseAuthGuard)
   async updateProfile(
     @Req() request: Request,
     @Body() updateProfileDto: UpdateProfileDto,
   ) {
-    try {
-      const result = await this.authService.updateUserProfile(
-        request.user.id,
-        updateProfileDto,
-      );
+    const result = await this.authService.updateUserProfile(
+      request.user.id,
+      updateProfileDto,
+    );
 
-      if (result.success) {
-        return {
-          statusCode: HttpStatus.OK,
-          message: result.message,
-          data: result.data,
-        };
-      } else {
-        throw new HttpException(
-          {
-            statusCode: HttpStatus.BAD_REQUEST,
-            message: result.message,
-            error: result.error,
-          },
-          HttpStatus.BAD_REQUEST,
-        );
-      }
-    } catch (error) {
-      if (error instanceof HttpException) {
-        throw error;
-      }
-      throw new HttpException(
-        {
-          statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
-          message: 'An unexpected error occurred while updating profile.',
-          error: error.message,
-        },
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+    if (result.success) {
+      return ApiResponse.success(result.data, result.message);
+    } else {
+      return ApiResponse.error(result.message, result.error);
     }
   }
 }

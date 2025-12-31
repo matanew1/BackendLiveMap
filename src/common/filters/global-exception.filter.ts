@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { QueryFailedError, EntityNotFoundError } from 'typeorm';
+import { ApiResponse } from '../dto/api-response.dto';
 
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
@@ -57,14 +58,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       );
     }
 
-    const errorResponse = {
-      statusCode: status,
-      timestamp: new Date().toISOString(),
-      path: request.url,
-      method: request.method,
-      message,
-      error,
-    };
+    const errorResponse = ApiResponse.error(message, error);
 
     // Log error details for debugging
     this.logger.error(
