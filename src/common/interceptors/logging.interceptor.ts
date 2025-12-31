@@ -31,8 +31,8 @@ export class LoggingInterceptor implements NestInterceptor {
           `Response: ${method} ${url} ${statusCode} - ${duration}ms`,
         );
 
-        // Log slow requests (>1000ms)
-        if (duration > 1000) {
+        // Log slow requests (>2000ms)
+        if (duration > 2000) {
           this.logger.warn(`Slow Request: ${method} ${url} took ${duration}ms`);
         }
       }),

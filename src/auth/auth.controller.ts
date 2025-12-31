@@ -12,6 +12,7 @@ import {
   Req,
   Delete,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import {
   ApiTags,
   ApiOperation,
@@ -47,6 +48,7 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('signup')
+  @Throttle({ default: { limit: 3, ttl: 60000 } }) // 3 requests per minute for signup
   @ApiOperation({ summary: 'Sign up a new user' })
   @ApiResponse({ status: 201, description: 'User created successfully' })
   @ApiResponse({
@@ -93,6 +95,7 @@ export class AuthController {
   }
 
   @Post('signin')
+  @Throttle({ default: { limit: 5, ttl: 60000 } }) // 5 requests per minute for signin
   @ApiOperation({ summary: 'Sign in user' })
   @ApiResponse({ status: 200, description: 'User signed in successfully' })
   @ApiResponse({
