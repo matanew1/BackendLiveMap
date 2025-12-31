@@ -203,7 +203,9 @@ export class UploadService {
                 `UpdateAvatar - Cleanup warning (non-critical): ${cleanupError.message}`,
               );
             } else {
-              this.logger.log('UpdateAvatar - Old file cleaned up successfully');
+              this.logger.log(
+                'UpdateAvatar - Old file cleaned up successfully',
+              );
             }
           }
         } catch (cleanupError) {
