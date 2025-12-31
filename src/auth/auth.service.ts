@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { User, UserRole } from './user.entity';
 import { ApiResponse } from '../common/dto/api-response.dto';
@@ -14,6 +15,7 @@ export class AuthService {
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
     private configService: ConfigService,
+    private jwtService: JwtService,
   ) {
     const supabaseUrl = this.configService.get<string>('supabase.url');
     const supabaseKey = this.configService.get<string>(
@@ -75,7 +77,17 @@ export class AuthService {
         );
       }
 
-      return ApiResponse.success('Signed in successfully.', data);
+      // Generate JWT token
+      const payload = {
+        sub: data.user.id,
+        email: data.user.email,
+      };
+      const accessToken = this.jwtService.sign(payload);
+
+      return ApiResponse.success('Signed in successfully.', {
+        accessToken,
+        user: data.user,
+      });
     } catch (error) {
       return ApiResponse.error(
         'An unexpected error occurred during signin.',

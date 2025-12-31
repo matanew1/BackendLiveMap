@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
+import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
@@ -16,6 +17,12 @@ async function bootstrap() {
 
   // Global logging interceptor
   app.useGlobalInterceptors(new LoggingInterceptor());
+
+  // Enable Helmet for security headers
+  // helmet is for security, but COOP and OAC are disabled for compatibility with certain features
+  app.use(
+    helmet({ crossOriginOpenerPolicy: false, originAgentCluster: false }),
+  );
 
   // Enable CORS with config
   app.enableCors({
@@ -39,7 +46,6 @@ async function bootstrap() {
     .setDescription('API for Cy-Dog backend application')
     .setVersion('1.0')
     .addTag('auth')
-    .addTag('locations')
     .addTag('health')
     .addBearerAuth(
       {
@@ -54,7 +60,13 @@ async function bootstrap() {
     )
     .build();
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api', app, document);
+  SwaggerModule.setup('api', app, document, {
+    customCssUrl: 'http://unpkg.com/swagger-ui-dist@5.10.3/swagger-ui.css',
+    customJs: [
+      'http://unpkg.com/swagger-ui-dist@5.10.3/swagger-ui-bundle.js',
+      'http://unpkg.com/swagger-ui-dist@5.10.3/swagger-ui-standalone-preset.js',
+    ],
+  });
 
   const port = configService.get<number>('app.port') || 3000;
   const host = configService.get<string>('app.host') || 'localhost';

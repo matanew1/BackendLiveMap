@@ -191,7 +191,7 @@ export class AuthController {
       return {
         statusCode: HttpStatus.OK,
         message: 'User information retrieved successfully.',
-        data: request.authResult.data,
+        data: request.user,
       };
     } catch (error) {
       if (error instanceof HttpException) {

@@ -32,11 +32,12 @@ declare module 'express' {
     authResult?: any;
   }
 }
-import { UploadService } from './upload.service';
+import { Token } from '../common/decorators/token.decorator';
 import { SupabaseAuthGuard } from '../auth/auth.guard';
+import { UploadService } from './upload.service';
 import { User } from '../auth/user.entity';
 
-@ApiExtraModels(User)
+@ApiExtraModels(User) // To document User model in Swagger
 @ApiTags('upload')
 @Controller('upload')
 export class UploadController {
@@ -94,14 +95,13 @@ export class UploadController {
   })
   @ApiBearerAuth('JWT-auth')
   @UseGuards(SupabaseAuthGuard)
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file')) // 'file' is the field name in the form-data
   async uploadAvatar(
     @Req() request: Request,
     @UploadedFile() file: Express.Multer.File,
+    @Token() token: string,
   ) {
     try {
-      const authHeader = request.headers.authorization;
-      const token = authHeader?.replace('Bearer ', '');
       const result = await this.uploadService.uploadAvatar(
         request.user.id,
         file,
@@ -202,10 +202,9 @@ export class UploadController {
   async updateAvatar(
     @Req() request: Request,
     @UploadedFile() file: Express.Multer.File,
+    @Token() token: string,
   ) {
     try {
-      const authHeader = request.headers.authorization;
-      const token = authHeader?.replace('Bearer ', '');
       const result = await this.uploadService.updateAvatar(
         request.user.id,
         file,
@@ -274,10 +273,8 @@ export class UploadController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 500, description: 'Internal server error' })
-  async deleteAvatar(@Req() request: Request) {
+  async deleteAvatar(@Req() request: Request, @Token() token: string) {
     try {
-      const authHeader = request.headers.authorization;
-      const token = authHeader?.replace('Bearer ', '');
       const result = await this.uploadService.deleteAvatar(
         request.user.id,
         token,

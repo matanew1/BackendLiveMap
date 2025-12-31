@@ -67,6 +67,7 @@ export class ConfigValidationService {
     const appConfig = plainToClass(AppConfig, {
       PORT: parseInt(this.rawConfig?.PORT || '3000', 10),
       CORS_ORIGIN: this.rawConfig?.CORS_ORIGIN,
+      JWT_SECRET: this.rawConfig?.JWT_SECRET,
     });
     const appErrors = validateSync(appConfig);
     if (appErrors.length > 0) {

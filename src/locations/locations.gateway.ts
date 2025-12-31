@@ -31,6 +31,7 @@ export class LocationsGateway
     console.log(`Connection closed: ${client.id}`);
   }
 
+  //subscribe means listen to this event
   @SubscribeMessage('update_location')
   async handleLocationUpdate(
     @MessageBody()

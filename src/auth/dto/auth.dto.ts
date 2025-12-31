@@ -8,6 +8,7 @@ import {
   IsNumber,
 } from 'class-validator';
 import { UserRole } from '../user.entity';
+import { IsStrongPassword } from '../../common/decorators/strong-password.decorator';
 
 export class SignUpDto {
   @ApiProperty({ example: 'matanew1@gmail.com', description: 'User email' })
@@ -17,6 +18,7 @@ export class SignUpDto {
   @ApiProperty({ example: 'strongpassword123', description: 'User password' })
   @IsString()
   @MinLength(8)
+  @IsStrongPassword()
   password: string;
 }
 
@@ -25,7 +27,7 @@ export class SignInDto {
   @IsEmail()
   email: string;
 
-  @ApiProperty({ example: 'Lily2702!!', description: 'User password' })
+  @ApiProperty({ example: '*******', description: 'User password' })
   @IsString()
   @MinLength(8)
   password: string;
