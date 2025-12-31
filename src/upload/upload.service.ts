@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
@@ -8,6 +8,7 @@ import { ApiResponse } from '../common/dto/api-response.dto';
 
 @Injectable()
 export class UploadService {
+  private readonly logger = new Logger(UploadService.name);
   private supabase: SupabaseClient;
 
   constructor(
@@ -63,7 +64,7 @@ export class UploadService {
         : this.supabase;
 
       // Try to upload the file directly to avatars bucket
-      console.log('Attempting to upload file to avatars bucket...');
+      this.logger.log('Attempting to upload file to avatars bucket...');
       const { data, error } = await client.storage
         .from('avatars') // assuming bucket name is 'avatars'
         .upload(fileName, file.buffer, {
@@ -72,7 +73,7 @@ export class UploadService {
         });
 
       if (error) {
-        console.error('Supabase storage upload error:', error);
+        this.logger.error('Supabase storage upload error:', error);
         // If the error is about bucket not existing, give a clearer message
         if (
           error.message.includes('not found') ||
@@ -92,7 +93,7 @@ export class UploadService {
         };
       }
 
-      console.log('Upload successful, getting public URL...');
+      this.logger.log('Upload successful, getting public URL...');
 
       const { data: publicUrl } = client.storage
         .from('avatars')
@@ -110,7 +111,7 @@ export class UploadService {
         data: { avatarUrl: cacheBustedUrl },
       };
     } catch (error) {
-      console.error('Unexpected error in uploadAvatar:', error);
+      this.logger.error('Unexpected error in uploadAvatar:', error);
       return {
         success: false,
         message: 'Error uploading avatar.',
@@ -133,10 +134,10 @@ export class UploadService {
 
       const fileName = `users/${userId}/avatar_${Date.now()}.jpg`; // Unique filename to avoid caching
 
-      console.log('UpdateAvatar - User found:', userId);
-      console.log('UpdateAvatar - Current avatarUrl:', user.avatarUrl);
-      console.log('UpdateAvatar - New fileName:', fileName);
-      console.log('UpdateAvatar - File details:', {
+      this.logger.log(`UpdateAvatar - User found: ${userId}`);
+      this.logger.log(`UpdateAvatar - Current avatarUrl: ${user.avatarUrl}`);
+      this.logger.log(`UpdateAvatar - New fileName: ${fileName}`);
+      this.logger.log('UpdateAvatar - File details:', {
         originalname: file.originalname,
         mimetype: file.mimetype,
         size: file.size,
@@ -158,11 +159,10 @@ export class UploadService {
           )
         : this.supabase;
 
-      console.log(
-        'UpdateAvatar - Using client type:',
-        token ? 'authenticated' : 'service_role',
+      this.logger.log(
+        `UpdateAvatar - Using client type: ${token ? 'authenticated' : 'service_role'}`,
       );
-      console.log('Updating existing avatar for user:', userId);
+      this.logger.log(`Updating existing avatar for user: ${userId}`);
 
       // Upload new avatar with unique filename
       const { data, error } = await client.storage
@@ -173,7 +173,7 @@ export class UploadService {
         });
 
       if (error) {
-        console.error('Supabase storage update error:', error);
+        this.logger.error('Supabase storage update error:', error);
         return {
           success: false,
           message: `Error updating avatar: ${error.message}`,
@@ -181,7 +181,7 @@ export class UploadService {
         };
       }
 
-      console.log('UpdateAvatar - Upload successful, data:', data);
+      this.logger.log('UpdateAvatar - Upload successful, data:', data);
 
       // If there was a previous avatar, try to clean it up
       if (user.avatarUrl) {
@@ -192,46 +192,43 @@ export class UploadService {
           )[1];
           const oldFileName = urlParts?.split('?')[0]; // Remove query params
           if (oldFileName && oldFileName !== fileName) {
-            console.log(
-              'UpdateAvatar - Attempting to clean up old file:',
-              oldFileName,
+            this.logger.log(
+              `UpdateAvatar - Attempting to clean up old file: ${oldFileName}`,
             );
             const { error: cleanupError } = await client.storage
               .from('avatars')
               .remove([oldFileName]);
             if (cleanupError) {
-              console.log(
-                'UpdateAvatar - Cleanup warning (non-critical):',
-                cleanupError.message,
+              this.logger.log(
+                `UpdateAvatar - Cleanup warning (non-critical): ${cleanupError.message}`,
               );
             } else {
-              console.log('UpdateAvatar - Old file cleaned up successfully');
+              this.logger.log('UpdateAvatar - Old file cleaned up successfully');
             }
           }
         } catch (cleanupError) {
-          console.log(
-            'UpdateAvatar - Cleanup failed (non-critical):',
-            cleanupError,
+          this.logger.log(
+            `UpdateAvatar - Cleanup failed (non-critical): ${cleanupError}`,
           );
         }
       }
-      console.log('Avatar updated successfully, getting public URL...');
+      this.logger.log('Avatar updated successfully, getting public URL...');
 
       const { data: publicUrl } = client.storage
         .from('avatars')
         .getPublicUrl(fileName);
 
-      console.log('UpdateAvatar - Public URL:', publicUrl.publicUrl);
+      this.logger.log(`UpdateAvatar - Public URL: ${publicUrl.publicUrl}`);
 
       // Add timestamp to bust cache
       const cacheBustedUrl = `${publicUrl.publicUrl}?t=${Date.now()}`;
 
-      console.log('UpdateAvatar - Cache busted URL:', cacheBustedUrl);
+      this.logger.log(`UpdateAvatar - Cache busted URL: ${cacheBustedUrl}`);
 
       // Update user avatarUrl in database
       await this.userRepo.update(userId, { avatarUrl: cacheBustedUrl });
 
-      console.log('UpdateAvatar - Database updated successfully');
+      this.logger.log('UpdateAvatar - Database updated successfully');
 
       return {
         success: true,
@@ -242,7 +239,7 @@ export class UploadService {
         },
       };
     } catch (error) {
-      console.error('Unexpected error in updateAvatar:', error);
+      this.logger.error('Unexpected error in updateAvatar:', error);
       return {
         success: false,
         message: 'Error updating avatar.',
