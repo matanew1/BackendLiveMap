@@ -13,11 +13,10 @@ export class UpdatePostDto {
   content?: string;
 
   @ApiProperty({
-    description: 'Updated location',
-    example: 'Central Park, New York',
+    description: 'Updated location (latitude and longitude)',
+    example: { lat: 40.7128, lng: -74.006 },
     required: false,
   })
   @IsOptional()
-  @IsString()
-  location?: string;
+  location?: { lat: number; lng: number };
 }

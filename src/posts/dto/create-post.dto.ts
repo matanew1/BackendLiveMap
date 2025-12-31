@@ -1,5 +1,5 @@
 // src/posts/dto/create-post.dto.ts
-import { IsString, IsOptional } from 'class-validator';
+import { IsString, IsOptional, IsNumber, Min, Max } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreatePostDto {
@@ -11,11 +11,10 @@ export class CreatePostDto {
   content: string;
 
   @ApiProperty({
-    description: 'Location where the post was made',
-    example: 'Central Park, New York',
+    description: 'Location where the post was made (latitude and longitude)',
+    example: { lat: 40.7128, lng: -74.006 },
     required: false,
   })
   @IsOptional()
-  @IsString()
-  location?: string;
+  location?: { lat: number; lng: number };
 }

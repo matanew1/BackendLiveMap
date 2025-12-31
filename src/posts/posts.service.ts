@@ -51,7 +51,9 @@ export class PostsService {
       user: user.dogName || 'Unknown',
       breed: user.dogBreed || '',
       age: user.dogAge || 0,
-      location: post.location,
+      location: post.location
+        ? this.parseGeographyLocation(post.location)
+        : null,
       content: post.content,
       time: this.formatTimeAgo(post.createdAt),
       likes: post.likesCount,
@@ -97,15 +99,21 @@ export class PostsService {
     userId: string,
     createPostDto: CreatePostDto,
   ): Promise<PostResponseDto> {
-    const post = this.postRepo.create({
-      id: uuidv4(),
-      userId,
-      content: createPostDto.content,
-      location: createPostDto.location,
-    });
+    const locationSql = createPostDto.location
+      ? `ST_SetSRID(ST_MakePoint(${createPostDto.location.lng}, ${createPostDto.location.lat}), 4326)`
+      : 'NULL';
 
-    const savedPost = await this.postRepo.save(post);
-    return this.mapPostToResponse(savedPost);
+    const result = await this.postRepo.query(
+      `
+      INSERT INTO posts (id, "userId", content, location)
+      VALUES ($1, $2, $3, ${locationSql})
+      RETURNING *
+    `,
+      [uuidv4(), userId, createPostDto.content],
+    );
+
+    const post = result[0];
+    return this.mapPostToResponse(post);
   }
 
   async updatePost(
@@ -127,7 +135,12 @@ export class PostsService {
       post.content = updatePostDto.content;
     }
     if (updatePostDto.location !== undefined) {
-      post.location = updatePostDto.location;
+      // For geography, we need to use raw SQL
+      const locationSql = `ST_SetSRID(ST_MakePoint(${updatePostDto.location.lng}, ${updatePostDto.location.lat}), 4326)`;
+      await this.postRepo.query(
+        `UPDATE posts SET location = ${locationSql} WHERE id = $1`,
+        [postId],
+      );
     }
 
     const updatedPost = await this.postRepo.save(post);
@@ -180,5 +193,16 @@ export class PostsService {
 
   async updatePostImage(postId: string, imageUrl: string): Promise<void> {
     await this.postRepo.update(postId, { imageUrl });
+  }
+
+  private parseGeographyLocation(
+    location: string,
+  ): { lat: number; lng: number } | null {
+    // PostGIS geography is returned as 'POINT(lng lat)' or similar
+    const match = location.match(/POINT\(([^ ]+) ([^)]+)\)/);
+    if (match) {
+      return { lng: parseFloat(match[1]), lat: parseFloat(match[2]) };
+    }
+    return null;
   }
 }

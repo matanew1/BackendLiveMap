@@ -33,11 +33,11 @@ export class PostResponseDto {
   age: number;
 
   @ApiProperty({
-    description: 'Location associated with the post',
-    example: 'Central Park, New York',
+    description: 'Location associated with the post (latitude and longitude)',
+    example: { lat: 40.7128, lng: -74.006 },
     nullable: true,
   })
-  location: string | null;
+  location: { lat: number; lng: number } | null;
 
   @ApiProperty({
     description: 'Content of the post',
