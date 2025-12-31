@@ -7,6 +7,7 @@ import {
   OnGatewayDisconnect,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
+import { Logger } from '@nestjs/common';
 import { LocationsService } from './locations.service';
 
 @WebSocketGateway({
@@ -19,16 +20,17 @@ export class LocationsGateway
   implements OnGatewayConnection, OnGatewayDisconnect
 {
   @WebSocketServer() server: Server;
+  private readonly logger = new Logger(LocationsGateway.name);
   private userRadii = new Map<string, number>();
 
   constructor(private readonly service: LocationsService) {}
 
   handleConnection(client: Socket) {
-    console.log(`Connection established: ${client.id}`);
+    this.logger.log(`Connection established: ${client.id}`);
   }
 
   handleDisconnect(client: Socket) {
-    console.log(`Connection closed: ${client.id}`);
+    this.logger.log(`Connection closed: ${client.id}`);
   }
 
   //subscribe means listen to this event
@@ -56,7 +58,7 @@ export class LocationsGateway
       data.filters,
     );
 
-    console.log('Nearby users:', nearby);
+    this.logger.log('Nearby users:', nearby);
 
     // 3. Broadcast update to the world
     this.server.emit('location_updated', {
@@ -90,7 +92,7 @@ export class LocationsGateway
       data.filters,
     );
 
-    console.log('Nearby users after radius update:', nearby);
+    this.logger.log('Nearby users after radius update:', nearby);
 
     // Emit updated nearby list
     this.server.emit('location_updated', {

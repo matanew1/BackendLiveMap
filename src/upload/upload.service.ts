@@ -267,14 +267,13 @@ export class UploadService {
       const fileName = urlParts?.split('?')[0]; // Remove query params like ?t=timestamp
 
       if (!fileName) {
-        console.error(
-          'Could not extract filename from avatar URL:',
-          user.avatarUrl,
+        this.logger.error(
+          `Could not extract filename from avatar URL: ${user.avatarUrl}`,
         );
         return ApiResponse.error('Invalid avatar URL format.');
       }
 
-      console.log('DeleteAvatar - Extracted filename:', fileName);
+      this.logger.log(`DeleteAvatar - Extracted filename: ${fileName}`);
 
       // Create authenticated client if token provided
       const client = token
@@ -291,14 +290,14 @@ export class UploadService {
           )
         : this.supabase;
 
-      console.log('Deleting avatar for user:', userId);
-      console.log('DeleteAvatar - Avatar URL:', user.avatarUrl);
+      this.logger.log(`Deleting avatar for user: ${userId}`);
+      this.logger.log(`DeleteAvatar - Avatar URL: ${user.avatarUrl}`);
 
       // Delete the file from storage
       const { error } = await client.storage.from('avatars').remove([fileName]);
 
       if (error) {
-        console.error('Supabase storage delete error:', error);
+        this.logger.error('Supabase storage delete error:', error);
         return {
           success: false,
           message: `Error deleting avatar: ${error.message}`,
@@ -306,12 +305,12 @@ export class UploadService {
         };
       }
 
-      console.log('DeleteAvatar - File deleted successfully from storage');
+      this.logger.log('DeleteAvatar - File deleted successfully from storage');
 
       // Clear avatarUrl in database
       await this.userRepo.update(userId, { avatarUrl: null as any });
 
-      console.log('DeleteAvatar - Database updated successfully');
+      this.logger.log('DeleteAvatar - Database updated successfully');
 
       return {
         success: true,
@@ -321,7 +320,7 @@ export class UploadService {
         },
       };
     } catch (error) {
-      console.error('Unexpected error in deleteAvatar:', error);
+      this.logger.error('Unexpected error in deleteAvatar:', error);
       return {
         success: false,
         message: 'Error deleting avatar.',
