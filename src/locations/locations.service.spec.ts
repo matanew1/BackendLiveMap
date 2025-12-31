@@ -86,10 +86,6 @@ describe('LocationsService', () => {
         expect.stringContaining('INSERT INTO users_locations'),
         ['user123', 34.890737, 32.081194],
       );
-      expect(mockUserRepository.query).toHaveBeenCalledWith(
-        `UPDATE users SET "lastLocation" = ST_SetSRID(ST_MakePoint($1, $2), 4326) WHERE id = $3`,
-        [34.890737, 32.081194, 'user123'],
-      );
     });
   });
 

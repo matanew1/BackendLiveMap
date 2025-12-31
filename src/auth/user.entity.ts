@@ -34,14 +34,6 @@ export class User {
   @Column({ nullable: true })
   avatarUrl: string;
 
-  @Column({
-    type: 'geography',
-    spatialFeatureType: 'Point',
-    srid: 4326,
-    nullable: true,
-  })
-  lastLocation: string;
-
   @CreateDateColumn()
   created_at: Date;
 }

@@ -1,5 +1,5 @@
-const { DataSource } = require('typeorm');
-const dotenv = require('dotenv');
+import { DataSource } from 'typeorm';
+import * as dotenv from 'dotenv';
 
 // Load environment variables
 dotenv.config();
@@ -14,4 +14,4 @@ const AppDataSource = new DataSource({
   logging: true,
 });
 
-module.exports = { AppDataSource };
+export { AppDataSource };
